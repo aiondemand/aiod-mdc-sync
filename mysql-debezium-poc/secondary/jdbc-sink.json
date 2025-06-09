@@ -1,0 +1,18 @@
+{
+    "name": "mysql-sink",
+    "config": {
+      "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+      "tasks.max": "1",
+  
+      "topics": "primary.test_db.items",
+      "connection.url": "jdbc:mysql://secondary-mysql:3306/test_db",
+      "connection.user": "test_user",
+      "connection.password": "test_pass",
+  
+      "insert.mode": "upsert",
+      "auto.create": "true",
+      "pk.mode": "record_key",
+      "pk.fields": "id"
+    }
+  }
+  
