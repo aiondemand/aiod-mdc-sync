@@ -66,10 +66,14 @@ services:
       - ./debezium-source.json:/tmp/connector.json:ro
     command: >
       bash -c "
-        connect-distributed /etc/kafka/connect-distributed.properties &
-        sleep 20 &&
-        curl -s -X POST -H 'Content-Type: application/json' \
+        ## 1  start Connect in the background
+        /kafka/bin/connect-distributed.sh /etc/kafka/connect-distributed.properties &
+        ## 2  wait until the REST API is up
+        while ! curl -s http://localhost:8083/ &>/dev/null; do sleep 3; done
+        ## 3  register (idempotent) the Debezium connector
+        curl -s -X PUT -H 'Content-Type: application/json' \
              --data @/tmp/connector.json \
-             http://localhost:8083/connectors &&
+             http://localhost:8083/connectors/mysql-source/config
+        ## 4  keep container alive
         tail -f /dev/null
       "
