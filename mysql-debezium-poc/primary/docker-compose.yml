@@ -1,0 +1,75 @@
+version: "3.8"
+
+networks:
+  pocnet:
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks: [pocnet]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on: [zookeeper]
+    env_file: .env
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: |
+        PLAINTEXT://0.0.0.0:9092,
+        EXTERNAL://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: |
+        PLAINTEXT://kafka:9092,
+        EXTERNAL://${PRIMARY_PUB_IP}:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"   # internal (optional to expose)
+      - "9093:9093"   # external, reachable by secondary
+    networks: [pocnet]
+
+  primary-mysql:
+    image: mysql:8.0
+    env_file: .env
+    command: --server-id=1 --log-bin=mysql-bin --binlog_format=ROW
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports: ["3306:3306"]
+    networks: [pocnet]
+
+  primary-api:
+    build: ./app
+    depends_on: [primary-mysql]
+    env_file: .env
+    environment:
+      DB_HOST: primary-mysql
+      DB_PORT: 3306
+    ports: ["8000:8000"]
+    networks: [pocnet]
+
+  # Kafka Connect running Debezium source
+  connect-src:
+    image: debezium/connect:2.6
+    depends_on: [kafka, primary-mysql]
+    networks: [pocnet]
+    ports: ["8083:8083"]
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: dbz_config
+      OFFSET_STORAGE_TOPIC: dbz_offsets
+      STATUS_STORAGE_TOPIC: dbz_statuses
+    volumes:
+      - ./debezium-source.json:/tmp/connector.json:ro
+    command: >
+      bash -c "
+        connect-distributed /etc/kafka/connect-distributed.properties &
+        sleep 20 &&
+        curl -s -X POST -H 'Content-Type: application/json' \
+             --data @/tmp/connector.json \
+             http://localhost:8083/connectors &&
+        tail -f /dev/null
+      "

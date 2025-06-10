@@ -133,9 +133,6 @@ cython_debug/
 .qodo/
 geo-mysql-debezium-poc/.qodo/
 
-# Docker
-**/Dockerfile*
-**/docker-compose.yml
 
 # OS generated files
 .DS_Store
