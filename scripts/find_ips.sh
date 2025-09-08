@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#!/bin/bash
+
 echo "Network Interface Information:"
 echo "-------------------------"
 
@@ -18,3 +20,4 @@ curl -s ifconfig.me
 echo -e "\nHostname Information:"
 echo "-------------------------"
 hostname -I
+

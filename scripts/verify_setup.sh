@@ -1,19 +1,67 @@
 #!/bin/bash
 
+# Function to show Docker installation instructions
+show_docker_instructions() {
+    local os=$1
+    echo "Docker is not installed!"
+    echo "Installation instructions for $os:"
+    case $os in
+        "ubuntu"|"debian")
+            echo "Run these commands:"
+            echo "  sudo apt-get update"
+            echo "  sudo apt-get install -y docker.io docker-compose"
+            ;;
+        "centos"|"rhel"|"fedora")
+            echo "Run these commands:"
+            echo "  sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo"
+            echo "  sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin"
+            ;;
+        *)
+            echo "Please visit https://docs.docker.com/engine/install/ for Docker installation"
+            ;;
+    esac
+}
+
+# Function to check Docker Swarm status
+check_docker_swarm() {
+    if docker info 2>/dev/null | grep -q "Swarm: active"; then
+        echo "Docker Swarm is already initialized"
+        echo "To add workers, run: docker swarm join-token worker"
+        echo "To add managers, run: docker swarm join-token manager"
+    else
+        echo "Docker Swarm is not initialized"
+        echo "To initialize Swarm, run:"
+        echo "  docker swarm init --advertise-addr $(hostname -I | awk '{print $1}')"
+    fi
+}
+
+# Detect OS
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+else
+    OS=$(uname -s)
+fi
+
 echo "Verifying Debezium PoC Setup..."
 echo "==============================="
 
 # Check Docker and Docker Compose
 echo "Checking Docker installation..."
 if ! command -v docker &> /dev/null; then
-    echo "Docker is not installed!"
+    show_docker_instructions $OS
     exit 1
 fi
 
 if ! command -v docker-compose &> /dev/null; then
     echo "Docker Compose is not installed!"
+    show_docker_instructions $OS
     exit 1
 fi
+
+# Check Docker Swarm status
+echo -e "\nChecking Docker Swarm status..."
+check_docker_swarm
 
 # Check environment files
 echo -e "\nChecking environment files..."
