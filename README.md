@@ -13,7 +13,12 @@ This Proof of Concept (PoC) demonstrates MySQL-to-MySQL data synchronization usi
    ```
 
 2. **Configure environment variables:**
-   - Copy `.env.example` to `.env` in both `primary/` and `secondary/`:
+   fix: improve README documentation with detailed setup verification steps
+   
+   - Add network connectivity requirements
+   - Include verification steps for Kafka Connect and Debezium
+   - Add troubleshooting section for common issues
+   - Clarify environment variables setup   - Copy `.env.example` to `.env` in both `primary/` and `secondary/`:
      ```bash
      cp primary/.env.example primary/.env
      cp secondary/.env.example secondary/.env
@@ -49,11 +54,90 @@ This Proof of Concept (PoC) demonstrates MySQL-to-MySQL data synchronization usi
      curl http://<SECONDARY_VM_IP>:8000/items
      ```
 
+## Usage & Execution Order
+
+1. **Pre-setup Verification:**
+   ```bash
+   # On both VMs: Check network and ports
+   ./scripts/find_ips.sh
+   ./scripts/check_ports.sh
+   ```
+
+2. **PRIMARY VM Setup:**
+   - Start services in this order:
+     ```bash
+     cd primary
+     docker-compose up -d mysql    # Wait for MySQL to be ready
+     docker-compose up -d kafka zookeeper
+     docker-compose up -d kafka-connect
+     docker-compose up -d app
+     ```
+   - Verify PRIMARY setup:
+     ```bash
+     ./scripts/verify_setup.sh
+     ```
+
+3. **SECONDARY VM Setup:**
+   - After PRIMARY is running, start secondary services:
+     ```bash
+     cd secondary
+     docker-compose up -d mysql
+     docker-compose up -d app
+     ```
+
+4. **Verify Connectivity:**
+   ```bash
+   # From SECONDARY VM, check connection to PRIMARY
+   ./scripts/check_ports.sh <PRIMARY_VM_IP>
+   curl http://<PRIMARY_VM_IP>:8083/connectors
+   ```
+
+5. **Start Data Synchronization:**
+   - Wait for all services to be healthy (usually 1-2 minutes)
+   - Check connector status as shown in Verify Setup section
+   - Test with sample data using the provided API endpoints
+
+Common workflow:
+1. Data is inserted into PRIMARY MySQL via FastAPI
+2. Debezium captures the changes
+3. Changes flow through Kafka
+4. JDBC Sink writes to SECONDARY MySQL
+5. Data is available via SECONDARY FastAPI
+
+## Directory Structure
+
+## Helper Scripts
+
+The `scripts/` directory contains helpful utilities for setup and troubleshooting:
+
+- `check_ports.sh`: Check if required ports are available and accessible
+- `find_ips.sh`: Display all network interfaces and IPs
+- `verify_setup.sh`: Verify all components are properly configured
+
+Usage:
+```bash
+# Make scripts executable
+chmod +x scripts/*.sh
+
+# Check ports (optionally provide remote host IP)
+./scripts/check_ports.sh [REMOTE_IP]
+
+# Find IP addresses
+./scripts/find_ips.sh
+
+# Verify setup
+./scripts/verify_setup.sh
+```
+
 ## Directory Structure
 
 ```
 mysql-debezium-poc/
 ├─ README.md
+├─ scripts/
+│  ├─ check_ports.sh
+│  ├─ find_ips.sh
+│  └─ verify_setup.sh
 ├─ primary/
 │  ├─ .env.example
 │  ├─ docker-compose.yml
