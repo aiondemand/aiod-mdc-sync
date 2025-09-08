@@ -19,7 +19,7 @@ This Proof of Concept (PoC) demonstrates MySQL-to-MySQL data synchronization usi
 ## Directory Structure
 
 ```
-geo-mysql-debezium-poc/
+mysql-debezium-poc/
 ├─ README.md
 ├─ primary/
 │  ├─ .env.example
