@@ -1,4 +1,4 @@
-# geo-mysql-debezium-poc
+# mysql-debezium-poc
 
 This Proof of Concept (PoC) demonstrates MySQL-to-MySQL data synchronization using Debezium. The project is split into two parts:
 
