@@ -22,17 +22,28 @@ show_docker_instructions() {
     esac
 }
 
-# Function to check Docker Swarm status
-check_docker_swarm() {
-    if docker info 2>/dev/null | grep -q "Swarm: active"; then
-        echo "Docker Swarm is already initialized"
-        echo "To add workers, run: docker swarm join-token worker"
-        echo "To add managers, run: docker swarm join-token manager"
-    else
-        echo "Docker Swarm is not initialized"
-        echo "To initialize Swarm, run:"
-        echo "  docker swarm init --advertise-addr $(hostname -I | awk '{print $1}')"
+# Function to check Docker Compose version
+check_docker_compose() {
+    echo "Checking Docker Compose versions..."
+    
+    # Check standalone docker-compose
+    if command -v docker-compose &> /dev/null; then
+        echo "Found standalone Docker Compose:"
+        docker-compose --version
     fi
+    
+    # Check Docker Compose plugin
+    if docker compose version &> /dev/null; then
+        echo "Found Docker Compose plugin:"
+        docker compose version
+    fi
+    
+    # If neither is found
+    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+        echo "Docker Compose is not installed!"
+        return 1
+    fi
+    return 0
 }
 
 # Detect OS
@@ -53,15 +64,12 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-if ! command -v docker-compose &> /dev/null; then
-    echo "Docker Compose is not installed!"
+# Check Docker Compose versions
+check_docker_compose || {
+    echo "Docker Compose is required but not found"
     show_docker_instructions $OS
     exit 1
-fi
-
-# Check Docker Swarm status
-echo -e "\nChecking Docker Swarm status..."
-check_docker_swarm
+}
 
 # Check environment files
 echo -e "\nChecking environment files..."
