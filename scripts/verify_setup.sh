@@ -57,19 +57,39 @@ fi
 echo "Verifying Debezium PoC Setup..."
 echo "==============================="
 
-# Check Docker and Docker Compose
+# Check Docker installation and permissions
 echo "Checking Docker installation..."
-if ! command -v docker &> /dev/null; then
+if command -v docker &> /dev/null; then
+    # Try to run docker version command
+    if docker version &> /dev/null || sudo docker version &> /dev/null; then
+        echo "Docker is installed and accessible"
+        docker version | grep "Version" || sudo docker version | grep "Version"
+    else
+        echo "WARNING: Docker is installed but may have permission issues"
+        echo "Try running: sudo usermod -aG docker $USER"
+        echo "Then log out and log back in"
+    fi
+else
     show_docker_instructions $OS
     exit 1
 fi
 
 # Check Docker Compose versions
-check_docker_compose || {
-    echo "Docker Compose is required but not found"
-    show_docker_instructions $OS
-    exit 1
-}
+echo -e "\nChecking Docker Compose installation..."
+if command -v docker-compose &> /dev/null || docker compose version &> /dev/null; then
+    check_docker_compose
+else
+    echo "WARNING: Docker Compose not found, checking alternative methods..."
+    # Try with sudo
+    if sudo docker-compose version &> /dev/null || sudo docker compose version &> /dev/null; then
+        echo "Docker Compose is available with sudo"
+        sudo docker-compose version 2>/dev/null || sudo docker compose version
+    else
+        echo "Docker Compose is required but not found"
+        show_docker_instructions $OS
+        exit 1
+    fi
+fi
 
 # Check environment files
 echo -e "\nChecking environment files..."
