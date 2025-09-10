@@ -9,7 +9,8 @@ show_docker_instructions() {
         "ubuntu"|"debian")
             echo "Run these commands:"
             echo "  sudo apt-get update"
-            echo "  sudo apt-get install -y docker.io docker-compose"
+            echo "  sudo apt-get install -y docker.io"
+            echo "  sudo apt-get install -y docker-compose-plugin"
             ;;
         "centos"|"rhel"|"fedora")
             echo "Run these commands:"
@@ -24,26 +25,17 @@ show_docker_instructions() {
 
 # Function to check Docker Compose version
 check_docker_compose() {
-    echo "Checking Docker Compose versions..."
+    echo "Checking Docker Compose plugin..."
     
-    # Check standalone docker-compose
-    if command -v docker-compose &> /dev/null; then
-        echo "Found standalone Docker Compose:"
-        docker-compose --version
-    fi
-    
-    # Check Docker Compose plugin
+    # Check Docker Compose plugin (preferred method)
     if docker compose version &> /dev/null; then
         echo "Found Docker Compose plugin:"
         docker compose version
+        return 0
     fi
     
-    # If neither is found
-    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-        echo "Docker Compose is not installed!"
-        return 1
-    fi
-    return 0
+    echo "Docker Compose plugin is not installed!"
+    return 1
 }
 
 # Detect OS
@@ -74,18 +66,18 @@ else
     exit 1
 fi
 
-# Check Docker Compose versions
+# Check Docker Compose plugin
 echo -e "\nChecking Docker Compose installation..."
-if command -v docker-compose &> /dev/null || docker compose version &> /dev/null; then
-    check_docker_compose
+if docker compose version &> /dev/null; then
+    echo "Found Docker Compose plugin:"
+    docker compose version
 else
-    echo "WARNING: Docker Compose not found, checking alternative methods..."
     # Try with sudo
-    if sudo docker-compose version &> /dev/null || sudo docker compose version &> /dev/null; then
-        echo "Docker Compose is available with sudo"
-        sudo docker-compose version 2>/dev/null || sudo docker compose version
+    if sudo docker compose version &> /dev/null; then
+        echo "Docker Compose plugin is available with sudo"
+        sudo docker compose version
     else
-        echo "Docker Compose is required but not found"
+        echo "Docker Compose plugin is required but not found"
         show_docker_instructions $OS
         exit 1
     fi

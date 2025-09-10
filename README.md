@@ -35,11 +35,11 @@ This Proof of Concept (PoC) demonstrates MySQL-to-MySQL data synchronization usi
 3. **Start services:**
    - On PRIMARY VM:
      ```bash
-     cd primary && docker-compose up --build
+     cd primary && docker compose up --build
      ```
    - On SECONDARY VM:
      ```bash
-     cd secondary && docker-compose up --build
+     cd secondary && docker compose up --build
      ```
 
 4. **Test synchronization:**
@@ -67,10 +67,10 @@ This Proof of Concept (PoC) demonstrates MySQL-to-MySQL data synchronization usi
    - Start services in this order:
      ```bash
      cd primary
-     docker-compose up -d mysql    # Wait for MySQL to be ready
-     docker-compose up -d kafka zookeeper
-     docker-compose up -d kafka-connect
-     docker-compose up -d app
+     docker compose up -d mysql    # Wait for MySQL to be ready
+     docker compose up -d kafka zookeeper
+     docker compose up -d kafka-connect
+     docker compose up -d app
      ```
    - Verify PRIMARY setup:
      ```bash
@@ -81,8 +81,8 @@ This Proof of Concept (PoC) demonstrates MySQL-to-MySQL data synchronization usi
    - After PRIMARY is running, start secondary services:
      ```bash
      cd secondary
-     docker-compose up -d mysql
-     docker-compose up -d app
+     docker compose up -d mysql
+     docker compose up -d app
      ```
 
 4. **Verify Connectivity:**
@@ -167,7 +167,8 @@ mysql-debezium-poc/
 
 ## Requirements
 
-- Docker & Docker Compose
+- Docker Engine (docker.io on Ubuntu/Debian, docker-ce on CentOS/RHEL)
+- Docker Compose Plugin (docker-compose-plugin)
 - Python 3.8+
 - Two VMs or servers with public IP addresses
 - Network connectivity between VMs on ports:
@@ -210,16 +211,23 @@ Key environment variables that need to be set in `.env` files:
 
 ## Troubleshooting
 
-- Ensure Docker Compose is installed and running
+- Ensure Docker Engine and Docker Compose plugin are installed:
+  ```bash
+  # Ubuntu/Debian
+  sudo apt-get install -y docker.io docker-compose-plugin
+  
+  # CentOS/RHEL
+  sudo dnf install -y docker-ce docker-compose-plugin
+  ```
 - Verify `.env` files are present and correctly configured
 - Check network/firewall settings between VMs
-- Use `docker-compose logs` for debugging service startup issues
+- Use `docker compose logs` for debugging service startup issues
 - Ensure all required ports are open between VMs
 
 ## Common Issues
 
 1. **Connectors not appearing:**
-   - Check if Kafka Connect is running: `docker-compose logs kafka-connect`
+   - Check if Kafka Connect is running: `docker compose logs kafka-connect`
    - Ensure all ports are accessible between VMs
    - Verify PRIMARY_PUB_IP is correct in both .env files
 
