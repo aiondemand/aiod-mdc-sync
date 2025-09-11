@@ -14,8 +14,12 @@ ip -4 addr show | grep -v 'valid_lft' | grep -v 'scope host' | grep -v 'docker' 
 
 echo -e "\nPrimary Network IP:"
 echo "-------------------------"
-# Get the primary network interface IP (usually eth0 or ens*)
-primary_ip=$(ip -4 addr show | grep -v 'docker' | grep -v 'br-' | grep -v 'lo' | grep 'inet' | grep -E 'eth0|ens' | head -1 | awk '{print $2}' | cut -d/ -f1)
+# Get the primary network interface IP by finding the interface for the default route
+primary_ip=$(ip route get 1.1.1.1 | grep -oP 'src \K\S+')
+if [ -z "$primary_ip" ]; then
+    # Fallback for systems where the above command doesn't work
+    primary_ip=$(ip -4 addr show | grep -v 'docker' | grep -v 'br-' | grep -v 'lo' | grep 'inet' | grep -E 'eth0|ens' | head -1 | awk '{print $2}' | cut -d/ -f1)
+fi
 echo "$primary_ip"
 
 echo -e "\nRecommended IP to use:"
