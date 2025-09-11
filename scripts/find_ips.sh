@@ -29,11 +29,22 @@ fi
 # Test local network connectivity
 echo -e "\nNetwork Connectivity Test:"
 echo "-------------------------"
-echo "Testing connectivity to common local network ranges..."
-for subnet in "192.168" "10.0" "172.16"; do
-    echo "Scanning $subnet.* network..."
-    for i in {1..254}; do
-        timeout 0.1 ping -c 1 "$subnet.1.$i" >/dev/null 2>&1 && echo "Found host: $subnet.1.$i"
+# Get the subnet from the primary IP
+if [ -n "$primary_ip" ]; then
+    subnet=$(echo "$primary_ip" | cut -d. -f1-3)
+    gateway="${subnet}.1"
+    echo "Testing connectivity to gateway ($gateway)..."
+    if ping -c 1 -W 1 "$gateway" >/dev/null 2>&1; then
+        echo "✅ Network gateway is reachable"
+    else
+        echo "⚠️  Could not reach network gateway"
+    fi
+    
+    # Test a few nearby IPs (quick check)
+    echo "Testing nearby hosts..."
+    for i in {2..5}; do
+        local_host="${subnet}.$i"
+        timeout 0.1 ping -c 1 "$local_host" >/dev/null 2>&1 && echo "Found host: $local_host"
     done
-done
+fi
 
