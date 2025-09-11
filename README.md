@@ -3,32 +3,96 @@
 This Proof of Concept (PoC) demonstrates MySQL-to-MySQL data synchronization using Debezium. The project is split into two parts:
 
 - **primary/**: Run this on the PRIMARY VM. Hosts the source MySQL database and Debezium connector.
-- **secondary/**: Run this on the SECONDARY VM. Hosts the target MySQL database and a JDBC sink connector.
+- **second## Helper Scripts
+
+The project includes several utility scripts to help with setup and verification:
+
+- `generate_env.sh`: Creates environment files with the correct configuration
+  ```bash
+  ./scripts/generate_env.sh <role>  # role: primary or secondary
+  ```
+  
+- `verify_setup.sh`: Checks for required software and configuration
+  ```bash
+  ./scripts/verify_setup.sh
+  ```
+  
+- `find_ips.sh`: Shows network interface information and public IP
+  ```bash
+  ./scripts/find_ips.sh
+  ```
+  
+- `check_ports.sh`: Verifies port availability and connectivity
+  ```bash
+  ./scripts/check_ports.sh [remote_ip]
+  ```
+
+## Network Setup
+
+### Local Network Testing (Recommended for first-time setup)
+- Use local IP addresses (e.g., 192.168.x.x) for both machines
+- Ensure both machines can ping each other
+- No special network configuration needed if both machines are in the same network
+
+### Internet/Cloud Setup (Optional)
+- Requires public IP addresses or DNS names
+- Need to configure firewalls to allow required ports
+- Suitable for testing across different networks or cloud providers
+
+## Notes
+
+- This PoC is for demonstration and testing purposes only
+- Start with local network testing before moving to public IP setup
+- Make sure Docker Compose plugin (not standalone) is installed
+- Check firewall rules if experiencing connectivity issues
+- Use the helper scripts to troubleshoot common problems**: Run this on the SECONDARY VM. Hosts the target MySQL database and a JDBC sink connector.
+
+## Prerequisites
+
+- Docker Engine
+- Docker Compose Plugin (not the standalone docker-compose)
+- Python 3.8+
+- Two machines (can be VMs or physical) in the same network
+  - Public IPs are optional and only needed for cross-internet communication
+  - Local IPs are sufficient for testing in the same network
 
 ## Quick Start
 
 1. **Clone this repository on both PRIMARY and SECONDARY VMs:**
    ```bash
-   git clone https://github.com/your-username/mysql-debezium-poc.git
+   git clone https://github.com/agimenobono/mysql-debezium-poc.git
+   cd mysql-debezium-poc
    ```
 
-2. **Configure environment variables:**
-   fix: improve README documentation with detailed setup verification steps
+2. **Set up helper scripts:**
+   ```bash
+   # Make all scripts executable
+   chmod +x scripts/*.sh
    
-   - Add network connectivity requirements
-   - Include verification steps for Kafka Connect and Debezium
-   - Add troubleshooting section for common issues
-   - Clarify environment variables setup   - Copy `.env.example` to `.env` in both `primary/` and `secondary/`:
-     ```bash
-     cp primary/.env.example primary/.env
-     cp secondary/.env.example secondary/.env
-     ```
+   # Verify environment setup on both VMs
+   ./scripts/verify_setup.sh
+   
+   # Check network connectivity and find IP addresses
+   ./scripts/find_ips.sh
+   ./scripts/check_ports.sh
+   ```
+
+3. **Generate environment files:**
+   ```bash
+   # On PRIMARY VM:
+   ./scripts/generate_env.sh primary
+   
+   # On SECONDARY VM:
+   ./scripts/generate_env.sh secondary
+   ```
    - Edit both `.env` files and set these required values:
-     - `PRIMARY_PUB_IP`: Public IP/DNS of PRIMARY VM
+     - `PRIMARY_PUB_IP`: IP address of PRIMARY machine (can be local IP if both machines are in the same network)
      - `MYSQL_ROOT_PASSWORD`: Choose a secure password
      - `MYSQL_DATABASE`: Name for your database
      - `MYSQL_USER`: Application database user
      - `MYSQL_PASSWORD`: Application user password
+     
+   Note: For local testing, use the local IP address (e.g., 192.168.x.x) of the PRIMARY machine
 
    Make sure both VMs can reach each other on the required ports (8000, 8083, 9093)
 
@@ -131,13 +195,16 @@ chmod +x scripts/*.sh
 
 ## Directory Structure
 
+## Directory Structure
+
 ```
 mysql-debezium-poc/
 ├─ README.md
 ├─ scripts/
-│  ├─ check_ports.sh
-│  ├─ find_ips.sh
-│  └─ verify_setup.sh
+│  ├─ check_ports.sh      # Check port availability
+│  ├─ find_ips.sh         # Display network information
+│  ├─ generate_env.sh     # Generate .env files
+│  └─ verify_setup.sh     # Verify environment setup
 ├─ primary/
 │  ├─ .env.example
 │  ├─ docker-compose.yml
@@ -156,7 +223,6 @@ mysql-debezium-poc/
        ├─ Dockerfile
        ├─ requirements.txt
        └─ main.py
-```
 
 ## Exposed Ports
 
