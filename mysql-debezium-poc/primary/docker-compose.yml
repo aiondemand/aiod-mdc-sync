@@ -34,7 +34,13 @@ services:
   primary-mysql:
     image: mysql:8.0
     env_file: .env
-    command: --server-id=1 --log-bin=mysql-bin --binlog_format=ROW
+    # ✅ Add FULL row image + keep existing binlog settings
+    command: >
+      --server-id=1
+      --log-bin=mysql-bin
+      --binlog_format=ROW
+      --binlog_row_image=FULL
+      --binlog_expire_logs_seconds=604800     # 7 days; adjust as you like
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports: ["3306:3306"]
