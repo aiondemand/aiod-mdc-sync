@@ -52,31 +52,24 @@ services:
 
   # Kafka Connect running Debezium source
   connect-src:
-    image: debezium/connect:2.6
+    image: quay.io/debezium/connect:2.6
+    container_name: primary-connect-src-1
     depends_on: [kafka, primary-mysql]
     networks: [pocnet]
     ports: ["8083:8083"]
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
-      GROUP_ID: 1
+      GROUP_ID: "1"
       CONFIG_STORAGE_TOPIC: dbz_config
       OFFSET_STORAGE_TOPIC: dbz_offsets
       STATUS_STORAGE_TOPIC: dbz_statuses
+      # Optional: converters & logging
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       KAFKA_LOG4J_OPTS: "-Dlog4j.configuration=file:/etc/kafka/connect-log4j.properties"
     volumes:
       - ./debezium-source.json:/tmp/connector.json:ro
       - ./connect-log4j.properties:/etc/kafka/connect-log4j.properties:ro
-      - ./connect-distributed.properties:/etc/kafka/connect-distributed.properties:ro
-    command: >
-      bash -c "
-        ## 1  start Connect in the background
-        /kafka/bin/connect-distributed.sh /etc/kafka/connect-distributed.properties &
-        ## 2  wait until the REST API is up
-        while ! curl -s http://localhost:8083/ &>/dev/null; do sleep 3; done
-        ## 3  register (idempotent) the Debezium connector
-        curl -s -X PUT -H 'Content-Type: application/json' \
-             --data @/tmp/connector.json \
-             http://localhost:8083/connectors/mysql-source/config
-        ## 4  keep container alive
-        tail -f /dev/null
-      "
+    # No custom command: let the entrypoint start the worker
