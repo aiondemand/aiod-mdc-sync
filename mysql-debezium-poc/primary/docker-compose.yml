@@ -66,6 +66,7 @@ services:
     volumes:
       - ./debezium-source.json:/tmp/connector.json:ro
       - ./connect-log4j.properties:/etc/kafka/connect-log4j.properties:ro
+      - ./connect-distributed.properties:/etc/kafka/connect-distributed.properties:ro
     command: >
       bash -c "
         ## 1  start Connect in the background
