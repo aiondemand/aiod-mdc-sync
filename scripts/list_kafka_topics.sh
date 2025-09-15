@@ -14,8 +14,18 @@ fi
 echo "🔎 Listing all Kafka topics from container '$KAFKA_CONTAINER_NAME'..."
 echo "----------------------------------------"
 
-# Execute the kafka-topics.sh script inside the specified kafka container to list topics
-docker exec "$KAFKA_CONTAINER_NAME" /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
+# Figure out the correct command inside container
+if docker exec "$KAFKA_CONTAINER_NAME" bash -lc 'command -v kafka-topics.sh >/dev/null 2>&1'; then
+    KAFKA_TOPICS_CMD="kafka-topics.sh"
+elif docker exec "$KAFKA_CONTAINER_NAME" bash -lc 'command -v kafka-topics >/dev/null 2>&1'; then
+    KAFKA_TOPICS_CMD="kafka-topics"
+else
+    echo "Error: kafka-topics(.sh) command not found in container '$KAFKA_CONTAINER_NAME'."
+    exit 1
+fi
+
+# Execute inside container
+docker exec "$KAFKA_CONTAINER_NAME" bash -lc "$KAFKA_TOPICS_CMD --bootstrap-server localhost:9092 --list"
 
 echo "----------------------------------------"
 echo "To inspect a specific topic, run:"
