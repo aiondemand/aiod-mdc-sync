@@ -63,6 +63,7 @@ services:
       CONFIG_STORAGE_TOPIC: dbz_config
       OFFSET_STORAGE_TOPIC: dbz_offsets
       STATUS_STORAGE_TOPIC: dbz_statuses
+      CONNECT_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.reflections=ERROR"
     volumes:
       - ./debezium-source.json:/tmp/connector.json:ro
     command: >
