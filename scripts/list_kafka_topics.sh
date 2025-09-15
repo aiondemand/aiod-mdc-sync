@@ -15,7 +15,7 @@ echo "🔎 Listing all Kafka topics from container '$KAFKA_CONTAINER_NAME'..."
 echo "----------------------------------------"
 
 # Execute the kafka-topics.sh script inside the specified kafka container to list topics
-docker exec "$KAFKA_CONTAINER_NAME" kafka-topics.sh --bootstrap-server localhost:9092 --list
+docker exec "$KAFKA_CONTAINER_NAME" /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
 
 echo "----------------------------------------"
 echo "To inspect a specific topic, run:"
