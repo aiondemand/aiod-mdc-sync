@@ -6,48 +6,55 @@ networks:
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
+    container_name: db-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
     networks: [pocnet]
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
+    container_name: db-kafka
     depends_on: [zookeeper]
     env_file: .env
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: |
-        PLAINTEXT://0.0.0.0:9092,
-        EXTERNAL://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: |
-        PLAINTEXT://kafka:9092,
-        EXTERNAL://${PRIMARY_PUB_IP}:9093
+      # two listeners: INTERNAL for containers; EXTERNAL for host/public
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:9093
+      # IMPORTANT: advertised INTERNAL must be the Docker **service name** (or an alias) reachable by other containers
+      # Your service name is "kafka" (top-level key), so use kafka:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://${PRIMARY_PUB_IP}:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
-      - "9092:9092"   # internal (optional to expose)
-      - "9093:9093"   # external, reachable by secondary
+      - "9092:9092"   # optional for host access
+      - "9093:9093"   # external listener for host/public
     networks: [pocnet]
 
   primary-mysql:
     image: mysql:8.0
+    container_name: db-mysql
     env_file: .env
-    # ✅ Add FULL row image + keep existing binlog settings
-    command: >
-      --server-id=1
-      --log-bin=mysql-bin
-      --binlog_format=ROW
-      --binlog_row_image=FULL
-      --binlog_expire_logs_seconds=604800     # 7 days; adjust as you like
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog_format=ROW
+      - --binlog_row_image=FULL
+      - --binlog_expire_logs_seconds=604800
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports: ["3306:3306"]
     networks: [pocnet]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   primary-api:
     build: ./app
+    container_name: db-api
     depends_on: [primary-mysql]
     env_file: .env
     environment:
@@ -59,7 +66,7 @@ services:
   # Kafka Connect running Debezium source
   connect-src:
     image: quay.io/debezium/connect:2.6
-    container_name: primary-connect-src-1
+    container_name: db-connect 
     depends_on: [kafka, primary-mysql]
     networks: [pocnet]
     ports: ["8083:8083"]
