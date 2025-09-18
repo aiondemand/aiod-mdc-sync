@@ -18,7 +18,7 @@
     "auto.create": "true",
     "auto.evolve": "true",
 
-    "transforms": "extract,route",
+    "transforms": "extract,ts_created,route",
     "transforms.extract.type": "org.apache.kafka.connect.transforms.ExtractField$Value",
     "transforms.extract.field": "after",
     "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
