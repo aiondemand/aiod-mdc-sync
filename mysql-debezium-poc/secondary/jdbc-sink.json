@@ -4,7 +4,7 @@
     "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
     "tasks.max": "1",
 
-    "topics": "primary2.test_db.items",
+    "topics": "primary.test_db.items",
 
     "connection.url": "jdbc:mysql://secondary-mysql:3306/test_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC",
     "connection.user": "test_user",
@@ -22,7 +22,7 @@
     "transforms.extract.type": "org.apache.kafka.connect.transforms.ExtractField$Value",
     "transforms.extract.field": "after",
     "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
-    "transforms.route.regex": "^primary2\\.test_db\\.(.*)$",
+    "transforms.route.regex": "^primary\\.test_db\\.(.*)$",
     "transforms.route.replacement": "$1",
 
     "table.name.format": "${topic}"
