@@ -98,8 +98,8 @@ services:
       # Optional: converters & logging
       KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      KEY_CONVERTER_SCHEMAS_ENABLE: "true"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "true"
       KAFKA_LOG4J_OPTS: "-Dlog4j.configuration=file:/etc/kafka/connect-log4j.properties"
     volumes:
       - ./debezium-source.json:/tmp/connector.json:ro
