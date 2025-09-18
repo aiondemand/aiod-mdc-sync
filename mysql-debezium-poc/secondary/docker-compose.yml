@@ -26,7 +26,7 @@ services:
     networks: [pocnet]
 
 connect-sink:
-  build: .                               # image with JDBC plugin installed
+  build: .
   container_name: connect-sink
   env_file: .env
   networks: [pocnet]
@@ -54,31 +54,31 @@ connect-sink:
       set -euo pipefail
 
       # 1) Resolve bootstrap (supports either var; set ONE in .env)
-      BS="${CONNECT_BOOTSTRAP_SERVERS:-${BOOTSTRAP_SERVERS:-}}"
-      if [ -z "$BS" ]; then
+      BS="$${CONNECT_BOOTSTRAP_SERVERS:-$${BOOTSTRAP_SERVERS:-}}"
+      if [ -z "$$BS" ]; then
         echo "ERROR: Set CONNECT_BOOTSTRAP_SERVERS or BOOTSTRAP_SERVERS in .env (e.g. 10.151.16.160:9093)"; exit 1;
       fi
-      echo "Using bootstrap.servers=$BS"
+      echo "Using bootstrap.servers=$$BS"
 
       # 2) Quick TCP probe
-      H="${BS%:*}"; P="${BS##*:}"
-      (bash -lc ">/dev/tcp/$H/$P") || { echo "ERROR: Cannot reach $H:$P from connect-sink"; exit 2; }
+      H="$${BS%:*}"; P="$${BS##*:}"
+      (bash -lc ">/dev/tcp/$$H/$$P") || { echo "ERROR: Cannot reach $$H:$$P from connect-sink"; exit 2; }
 
       # 3) Generate properties explicitly (no chance of localhost:9092)
       {
-        printf 'bootstrap.servers=%s\n' "$BS"
-        printf 'group.id=%s\n' "${CONNECT_GROUP_ID:-sink}"
-        printf 'key.converter=%s\n' "${CONNECT_KEY_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}"
-        printf 'value.converter=%s\n' "${CONNECT_VALUE_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}"
-        printf 'key.converter.schemas.enable=%s\n' "${CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE:-false}"
-        printf 'value.converter.schemas.enable=%s\n' "${CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE:-false}"
-        printf 'config.storage.topic=%s\n' "${CONNECT_CONFIG_STORAGE_TOPIC:-sink_config}"
-        printf 'offset.storage.topic=%s\n' "${CONNECT_OFFSET_STORAGE_TOPIC:-sink_offsets}"
-        printf 'status.storage.topic=%s\n' "${CONNECT_STATUS_STORAGE_TOPIC:-sink_status}"
-        printf 'config.storage.replication.factor=%s\n' "${CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR:-1}"
-        printf 'offset.storage.replication.factor=%s\n' "${CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR:-1}"
-        printf 'status.storage.replication.factor=%s\n' "${CONNECT_STATUS_STORAGE_REPLICATION_FACTOR:-1}"
-        printf 'plugin.path=%s\n' "${CONNECT_PLUGIN_PATH:-/usr/share/confluent-hub-components}"
+        printf 'bootstrap.servers=%s\n' "$$BS"
+        printf 'group.id=%s\n' "$${CONNECT_GROUP_ID:-sink}"
+        printf 'key.converter=%s\n' "$${CONNECT_KEY_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}"
+        printf 'value.converter=%s\n' "$${CONNECT_VALUE_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}"
+        printf 'key.converter.schemas.enable=%s\n' "$${CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE:-false}"
+        printf 'value.converter.schemas.enable=%s\n' "$${CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE:-false}"
+        printf 'config.storage.topic=%s\n' "$${CONNECT_CONFIG_STORAGE_TOPIC:-sink_config}"
+        printf 'offset.storage.topic=%s\n' "$${CONNECT_OFFSET_STORAGE_TOPIC:-sink_offsets}"
+        printf 'status.storage.topic=%s\n' "$${CONNECT_STATUS_STORAGE_TOPIC:-sink_status}"
+        printf 'config.storage.replication.factor=%s\n' "$${CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR:-1}"
+        printf 'offset.storage.replication.factor=%s\n' "$${CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR:-1}"
+        printf 'status.storage.replication.factor=%s\n' "$${CONNECT_STATUS_STORAGE_REPLICATION_FACTOR:-1}"
+        printf 'plugin.path=%s\n' "$${CONNECT_PLUGIN_PATH:-/usr/share/confluent-hub-components}"
       } > /tmp/connect-distributed.properties
 
       grep '^bootstrap.servers' /tmp/connect-distributed.properties
