@@ -7,10 +7,10 @@ services:
   secondary-mysql:
     image: mysql:8.0
     env_file: .env
+    command: --server-id=2 --default-authentication-plugin=mysql_native_password
+    ports: ["3306:3306"]
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    command: --server-id=2
-    ports: ["3306:3306"]
     networks: [pocnet]
 
   secondary-api:
@@ -20,34 +20,45 @@ services:
     environment:
       DB_HOST: secondary-mysql
       DB_PORT: 3306
-    ports: ["8000:8000"]
+    ports: ["8001:8001"]
     networks: [pocnet]
 
   connect-sink:
-    image: confluentinc/kafka-connect-jdbc:10.7.0
+    build: .                      # your image with JDBC installed
+    container_name: connect-sink
     env_file: .env
-    depends_on: [secondary-mysql]
     networks: [pocnet]
     ports: ["8083:8083"]
     environment:
-      CONNECT_BOOTSTRAP_SERVERS: ${PRIMARY_PUB_IP}:9093
+      CONNECT_BOOTSTRAP_SERVERS: ${CONNECT_BOOTSTRAP_SERVERS}
       CONNECT_GROUP_ID: sink
       CONNECT_CONFIG_STORAGE_TOPIC: sink_config
       CONNECT_OFFSET_STORAGE_TOPIC: sink_offsets
       CONNECT_STATUS_STORAGE_TOPIC: sink_status
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
-      CONNECT_PLUGIN_PATH: /usr/share/java
+      CONNECT_PLUGIN_PATH: /usr/share/confluent-hub-components
+      # Optional if you register from outside the container:
+      # CONNECT_REST_ADVERTISED_HOST_NAME: connect-sink
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+    command: >
+      bash -lc '
+          set -euo pipefail
+          connect-distributed /etc/kafka/connect-distributed.properties &
+          curl -fsS --retry 60 --retry-delay 2 --retry-connrefused http://localhost:8083/ >/dev/null
+          curl -fsS "http://localhost:8083/connectors/mysql-sink" >/dev/null || \
+            curl -fsS -X POST -H "Content-Type: application/json" --data @/tmp/sink.json http://localhost:8083/connectors
+          tail -f /dev/null
+        '  
     volumes:
       - ./jdbc-sink.json:/tmp/sink.json:ro
-    command: >
-      bash -c "
-        connect-distributed /etc/kafka/connect-distributed.properties &
-        sleep 20 &&
-        curl -s -X POST -H 'Content-Type: application/json' \
-             --data @/tmp/sink.json \
-             http://localhost:8083/connectors &&
-        tail -f /dev/null
-      "

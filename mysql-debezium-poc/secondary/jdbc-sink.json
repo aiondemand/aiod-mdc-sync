@@ -1,18 +1,37 @@
 {
-    "name": "mysql-sink",
-    "config": {
-      "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
-      "tasks.max": "1",
-  
-      "topics": "primary.test_db.items",
-      "connection.url": "jdbc:mysql://secondary-mysql:3306/test_db",
-      "connection.user": "test_user",
-      "connection.password": "test_pass",
-  
-      "insert.mode": "upsert",
-      "auto.create": "true",
-      "pk.mode": "record_key",
-      "pk.fields": "id"
-    }
+  "name": "mysql-sink",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+
+    "topics": "primary.test_db.items",
+
+    "connection.url": "jdbc:mysql://secondary-mysql:3306/test_db?user=test_user&password=test_pass",
+    "connection.user": "test_user",
+    "connection.password": "test_pass",
+
+    "insert.mode": "upsert",
+    "pk.mode": "record_key",
+    "pk.fields": "id",
+
+    "auto.create": "true",
+    "auto.evolve": "true",
+
+    "delete.enabled": "true",
+    "behavior.on.null.values": "delete",
+
+    "table.name.format": "${topic}",
+
+    "transforms": "extract,route",
+    "transforms.extract.type": "org.apache.kafka.connect.transforms.ExtractField$Value",
+    "transforms.extract.field": "after",
+
+    "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.route.regex": "^primary\\.test_db\\.(.*)$",
+    "transforms.route.replacement": "$1",
+
+    "errors.tolerance": "all",
+    "errors.log.enable": "true",
+    "errors.log.include.messages": "true"
   }
-  
+}
