@@ -32,7 +32,6 @@ services:
     networks: [pocnet]
     ports: ["8083:8083"]
     environment:
-      CONNECT_BOOTSTRAP_SERVERS: ${CONNECT_BOOTSTRAP_SERVERS}
       CONNECT_GROUP_ID: sink
       CONNECT_CONFIG_STORAGE_TOPIC: sink_config
       CONNECT_OFFSET_STORAGE_TOPIC: sink_offsets
