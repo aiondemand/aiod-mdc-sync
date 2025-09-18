@@ -25,74 +25,74 @@ services:
     ports: ["8001:8001"]
     networks: [pocnet]
 
-connect-sink:
-  build: .
-  container_name: connect-sink
-  env_file: .env
-  networks: [pocnet]
-  ports: ["8083:8083"]
-  restart: unless-stopped
-  environment:
-    CONNECT_GROUP_ID: sink
-    CONNECT_CONFIG_STORAGE_TOPIC: sink_config
-    CONNECT_OFFSET_STORAGE_TOPIC: sink_offsets
-    CONNECT_STATUS_STORAGE_TOPIC: sink_status
-    CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
-    CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
-    CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
-    CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-    CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-    CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-    CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
-    CONNECT_PLUGIN_PATH: /usr/share/confluent-hub-components
-  volumes:
-    - ./jdbc-sink.json:/tmp/sink.json:ro
-  command:
-    - bash
-    - -lc
-    - |
-      set -euo pipefail
+  connect-sink:
+    build: .
+    container_name: connect-sink
+    env_file: .env
+    networks: [pocnet]
+    ports: ["8083:8083"]
+    restart: unless-stopped
+    environment:
+      CONNECT_GROUP_ID: sink
+      CONNECT_CONFIG_STORAGE_TOPIC: sink_config
+      CONNECT_OFFSET_STORAGE_TOPIC: sink_offsets
+      CONNECT_STATUS_STORAGE_TOPIC: sink_status
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_PLUGIN_PATH: /usr/share/confluent-hub-components
+    volumes:
+      - ./jdbc-sink.json:/tmp/sink.json:ro
+    command:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
 
-      # 1) Resolve bootstrap (supports either var; set ONE in .env)
-      BS="$${CONNECT_BOOTSTRAP_SERVERS:-$${BOOTSTRAP_SERVERS:-}}"
-      if [ -z "$$BS" ]; then
-        echo "ERROR: Set CONNECT_BOOTSTRAP_SERVERS or BOOTSTRAP_SERVERS in .env (e.g. 10.151.16.160:9093)"; exit 1;
-      fi
-      echo "Using bootstrap.servers=$$BS"
+        # 1) Resolve bootstrap (supports either var; set ONE in .env)
+        BS="$${CONNECT_BOOTSTRAP_SERVERS:-$${BOOTSTRAP_SERVERS:-}}"
+        if [ -z "$$BS" ]; then
+          echo "ERROR: Set CONNECT_BOOTSTRAP_SERVERS or BOOTSTRAP_SERVERS in .env (e.g. 10.151.16.160:9093)"; exit 1;
+        fi
+        echo "Using bootstrap.servers=$$BS"
 
-      # 2) Quick TCP probe
-      H="$${BS%:*}"; P="$${BS##*:}"
-      (bash -lc ">/dev/tcp/$$H/$$P") || { echo "ERROR: Cannot reach $$H:$$P from connect-sink"; exit 2; }
+        # 2) Quick TCP probe
+        H="$${BS%:*}"; P="$${BS##*:}"
+        (bash -lc ">/dev/tcp/$$H/$$P") || { echo "ERROR: Cannot reach $$H:$$P from connect-sink"; exit 2; }
 
-      # 3) Generate properties explicitly (no chance of localhost:9092)
-      {
-        printf 'bootstrap.servers=%s\n' "$$BS"
-        printf 'group.id=%s\n' "$${CONNECT_GROUP_ID:-sink}"
-        printf 'key.converter=%s\n' "$${CONNECT_KEY_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}"
-        printf 'value.converter=%s\n' "$${CONNECT_VALUE_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}"
-        printf 'key.converter.schemas.enable=%s\n' "$${CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE:-false}"
-        printf 'value.converter.schemas.enable=%s\n' "$${CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE:-false}"
-        printf 'config.storage.topic=%s\n' "$${CONNECT_CONFIG_STORAGE_TOPIC:-sink_config}"
-        printf 'offset.storage.topic=%s\n' "$${CONNECT_OFFSET_STORAGE_TOPIC:-sink_offsets}"
-        printf 'status.storage.topic=%s\n' "$${CONNECT_STATUS_STORAGE_TOPIC:-sink_status}"
-        printf 'config.storage.replication.factor=%s\n' "$${CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR:-1}"
-        printf 'offset.storage.replication.factor=%s\n' "$${CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR:-1}"
-        printf 'status.storage.replication.factor=%s\n' "$${CONNECT_STATUS_STORAGE_REPLICATION_FACTOR:-1}"
-        printf 'plugin.path=%s\n' "$${CONNECT_PLUGIN_PATH:-/usr/share/confluent-hub-components}"
-      } > /tmp/connect-distributed.properties
+        # 3) Generate properties explicitly (no chance of localhost:9092)
+        {
+          printf 'bootstrap.servers=%s\n' "$$BS"
+          printf 'group.id=%s\n' "$${CONNECT_GROUP_ID:-sink}"
+          printf 'key.converter=%s\n' "$${CONNECT_KEY_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}"
+          printf 'value.converter=%s\n' "$${CONNECT_VALUE_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}"
+          printf 'key.converter.schemas.enable=%s\n' "$${CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE:-false}"
+          printf 'value.converter.schemas.enable=%s\n' "$${CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE:-false}"
+          printf 'config.storage.topic=%s\n' "$${CONNECT_CONFIG_STORAGE_TOPIC:-sink_config}"
+          printf 'offset.storage.topic=%s\n' "$${CONNECT_OFFSET_STORAGE_TOPIC:-sink_offsets}"
+          printf 'status.storage.topic=%s\n' "$${CONNECT_STATUS_STORAGE_TOPIC:-sink_status}"
+          printf 'config.storage.replication.factor=%s\n' "$${CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR:-1}"
+          printf 'offset.storage.replication.factor=%s\n' "$${CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR:-1}"
+          printf 'status.storage.replication.factor=%s\n' "$${CONNECT_STATUS_STORAGE_REPLICATION_FACTOR:-1}"
+          printf 'plugin.path=%s\n' "$${CONNECT_PLUGIN_PATH:-/usr/share/confluent-hub-components}"
+        } > /tmp/connect-distributed.properties
 
-      grep '^bootstrap.servers' /tmp/connect-distributed.properties
+        grep '^bootstrap.servers' /tmp/connect-distributed.properties
 
-      # 4) Start Connect using our file
-      connect-distributed /tmp/connect-distributed.properties &
+        # 4) Start Connect using our file
+        connect-distributed /tmp/connect-distributed.properties &
 
-      # 5) Wait for REST
-      for i in $(seq 1 300); do curl -fsS http://localhost:8083/ >/dev/null && break || sleep 1; done
-      curl -fsS http://localhost:8083/ >/dev/null || { echo "ERROR: REST not ready after 300s"; exit 3; }
+        # 5) Wait for REST
+        for i in $(seq 1 300); do curl -fsS http://localhost:8083/ >/dev/null && break || sleep 1; done
+        curl -fsS http://localhost:8083/ >/dev/null || { echo "ERROR: REST not ready after 300s"; exit 3; }
 
-      # 6) Idempotent registration
-      curl -fsS http://localhost:8083/connectors/mysql-sink >/dev/null || \
-        curl -fsS -X POST -H 'Content-Type: application/json' --data @/tmp/sink.json http://localhost:8083/connectors
+        # 6) Idempotent registration
+        curl -fsS http://localhost:8083/connectors/mysql-sink >/dev/null || \
+          curl -fsS -X POST -H 'Content-Type: application/json' --data @/tmp/sink.json http://localhost:8083/connectors
 
-      # 7) Keep container alive
-      tail -f /dev/null
+        # 7) Keep container alive
+        tail -f /dev/null
