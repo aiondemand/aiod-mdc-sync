@@ -25,41 +25,82 @@ services:
     ports: ["8001:8001"]
     networks: [pocnet]
 
-  connect-sink:
-    build: .                      # your image with JDBC installed
-    container_name: connect-sink
-    env_file: .env
-    networks: [pocnet]
-    ports: ["8083:8083"]
-    environment:
-      CONNECT_GROUP_ID: sink
-      CONNECT_CONFIG_STORAGE_TOPIC: sink_config
-      CONNECT_OFFSET_STORAGE_TOPIC: sink_offsets
-      CONNECT_STATUS_STORAGE_TOPIC: sink_status
-      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
-      CONNECT_PLUGIN_PATH: /usr/share/confluent-hub-components
-      # Optional if you register from outside the container:
-      # CONNECT_REST_ADVERTISED_HOST_NAME: connect-sink
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8083/"]
-      interval: 5s
-      timeout: 3s
-      retries: 60
-      start_period: 10s
-    command: >
-      bash -lc '
-          set -euo pipefail
-          connect-distributed /etc/kafka/connect-distributed.properties &
-          curl -fsS --retry 60 --retry-delay 2 --retry-connrefused http://localhost:8083/ >/dev/null
-          curl -fsS "http://localhost:8083/connectors/mysql-sink" >/dev/null || \
-            curl -fsS -X POST -H "Content-Type: application/json" --data @/tmp/sink.json http://localhost:8083/connectors
-          tail -f /dev/null
-        '  
-    volumes:
-      - ./jdbc-sink.json:/tmp/sink.json:ro
+connect-sink:
+  build: .                               # your image that has the JDBC plugin installed
+  container_name: connect-sink
+  env_file: .env
+  networks: [pocnet]
+  ports:
+    - "8083:8083"
+  restart: unless-stopped
+  environment:
+    # Use your existing topics & converters; replication factors 1 for single-broker dev
+    CONNECT_GROUP_ID: sink
+    CONNECT_CONFIG_STORAGE_TOPIC: sink_config
+    CONNECT_OFFSET_STORAGE_TOPIC: sink_offsets
+    CONNECT_STATUS_STORAGE_TOPIC: sink_status
+    CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+    CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+    CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+    CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+    CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+    CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+    CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    CONNECT_PLUGIN_PATH: /usr/share/confluent-hub-components
+  volumes:
+    - ./jdbc-sink.json:/tmp/sink.json:ro
+  command: >
+    bash -lc '
+      set -euo pipefail
+
+      # 1) Resolve bootstrap from env (support Confluent or Debezium var names)
+      BS="${CONNECT_BOOTSTRAP_SERVERS:-${BOOTSTRAP_SERVERS:-}}"
+      if [ -z "$BS" ]; then
+        echo "ERROR: Set CONNECT_BOOTSTRAP_SERVERS or BOOTSTRAP_SERVERS in .env (e.g. 10.151.16.160:9093)"; exit 1;
+      fi
+      echo "Using bootstrap.servers=$BS"
+
+      # 2) Optional: quick TCP probe to catch obvious network issues early
+      H="${BS%:*}"; P="${BS##*:}"
+      ( bash -lc ">/dev/tcp/$H/$P" ) || { echo "ERROR: Cannot reach $H:$P from connect-sink"; exit 2; }
+
+      # 3) Generate properties file explicitly — guarantees no localhost:9092
+      cat >/tmp/connect-distributed.properties <<EOF
+bootstrap.servers=${BS}
+group.id=${CONNECT_GROUP_ID:-sink}
+key.converter=${CONNECT_KEY_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}
+value.converter=${CONNECT_VALUE_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}
+key.converter.schemas.enable=${CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE:-false}
+value.converter.schemas.enable=${CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE:-false}
+config.storage.topic=${CONNECT_CONFIG_STORAGE_TOPIC:-sink_config}
+offset.storage.topic=${CONNECT_OFFSET_STORAGE_TOPIC:-sink_offsets}
+status.storage.topic=${CONNECT_STATUS_STORAGE_TOPIC:-sink_status}
+config.storage.replication.factor=${CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR:-1}
+offset.storage.replication.factor=${CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR:-1}
+status.storage.replication.factor=${CONNECT_STATUS_STORAGE_REPLICATION_FACTOR:-1}
+plugin.path=${CONNECT_PLUGIN_PATH:-/usr/share/confluent-hub-components}
+/* You can add producer/consumer/admin security overrides here later if needed */
+EOF
+
+      echo "Generated /tmp/connect-distributed.properties:"
+      grep "^bootstrap.servers" /tmp/connect-distributed.properties
+
+      # 4) Start Connect using our file (works on Confluent or Debezium images)
+      connect-distributed /tmp/connect-distributed.properties &
+      # 5) Wait for REST to be alive
+      for i in {1..300}; do
+        curl -fsS http://localhost:8083/ >/dev/null && break || sleep 1
+      done
+      curl -fsS http://localhost:8083/ >/dev/null || { echo "ERROR: REST not ready after 300s"; exit 3; }
+
+      # 6) Idempotent registration of the sink connector
+      if ! curl -fsS http://localhost:8083/connectors/mysql-sink >/dev/null; then
+        echo "Registering mysql-sink"
+        curl -fsS -X POST -H "Content-Type: application/json" --data @/tmp/sink.json http://localhost:8083/connectors
+      else
+        echo "Connector mysql-sink already exists; skipping create"
+      fi
+
+      # 7) Keep the container running for logs/inspection
+      tail -f /dev/null
+    '
