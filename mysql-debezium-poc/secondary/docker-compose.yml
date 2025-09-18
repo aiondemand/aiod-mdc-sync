@@ -6,6 +6,7 @@ networks:
 services:
   secondary-mysql:
     image: mysql:8.0
+    container_name: "secondary-mysql"
     env_file: .env
     command: --server-id=2 --default-authentication-plugin=mysql_native_password
     ports: ["3306:3306"]
@@ -15,6 +16,7 @@ services:
 
   secondary-api:
     build: ./app
+    container_name: "secondary-api"
     depends_on: [secondary-mysql]
     env_file: .env
     environment:
