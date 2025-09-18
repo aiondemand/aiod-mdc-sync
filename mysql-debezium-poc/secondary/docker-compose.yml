@@ -44,6 +44,9 @@ services:
       CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "true"
       CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "true"
       CONNECT_PLUGIN_PATH: /usr/share/confluent-hub-components
+      CONNECT_CONSUMER_REQUEST_TIMEOUT_MS: 60000
+      CONNECT_CONSUMER_SESSION_TIMEOUT_MS: 60000
+      CONNECT_PRODUCER_MAX_BLOCK_MS: 60000
     volumes:
       - ./jdbc-sink.json:/tmp/sink.json:ro
     command:
