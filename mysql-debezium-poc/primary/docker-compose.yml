@@ -72,7 +72,8 @@ services:
       retries: 20
 
   primary-api:
-    build: ./app
+    build:
+      context: ../app
     container_name: db-api
     depends_on: [primary-mysql]
     env_file: .env
@@ -80,6 +81,7 @@ services:
       DB_HOST: primary-mysql
       DB_PORT: 3306
     ports: ["8000:8000"]
+    command: ["--port", "8000"]
     networks: [pocnet]
 
   # Kafka Connect running Debezium source

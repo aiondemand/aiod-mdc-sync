@@ -14,7 +14,8 @@ services:
     networks: [pocnet]
 
   secondary-api:
-    build: ./app
+    build:
+      context: ../app
     container_name: "secondary-api"
     depends_on: [secondary-mysql]
     env_file: .env
@@ -22,6 +23,7 @@ services:
       DB_HOST: secondary-mysql
       DB_PORT: 3306
     ports: ["8001:8001"]
+    command: ["--port", "8001"]
     networks: [pocnet]
 
   connect-sink:
