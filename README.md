@@ -24,7 +24,7 @@ Install on both machines:
 Run on **each VM**:
 
 ```bash
-git clone https://github.com/agimenobono/mysql-debezium-poc.git
+git clone https://github.com/<your-org>/mysql-debezium-poc.git
 cd mysql-debezium-poc/mysql-debezium-poc
 ```
 
@@ -68,33 +68,16 @@ cd primary
 docker compose up -d --build
 ```
 
-Once the containers are running, **from the same directory** execute the verification script:
+Once the containers are running, stay in the same directory and validate the setup in this order:
 
-```bash
-../../scripts/verify_setup.sh
-```
+1. `../../scripts/verify_setup.sh` – Confirms Docker/Compose, environment files, running containers, and the Kafka Connect REST API.
+2. `./scripts/register_mysql_connector.sh` – Waits for Kafka Connect, verifies the Debezium plugin, and applies the `mysql-source` connector configuration. Override defaults by exporting environment variables (for example `CONNECT_URL`, `MYSQL_HOST`, or `TOPIC_PREFIX`).
+3. `./scripts/check_debezium_connect.sh --container db-connect --connector-name mysql-source --show-config --validate-running` – Runs in the `db-connect` container to verify the worker, connector status, and configuration. Append `--check-topics --kafka-container db-kafka` to confirm internal Kafka topics.
 
-The script checks Docker, the Compose plugin, the presence of the `.env` files, running containers (MySQL, Kafka, Kafka Connect), and the Kafka Connect REST API. Resolve any warnings before continuing.
+Additional Kafka helpers are available under `primary/scripts/`:
 
-Next, register the Debezium MySQL source connector using the helper script inside the primary stack:
-
-```bash
-./scripts/register_mysql_connector.sh
-```
-
-The script waits for the Connect REST endpoint, verifies the Debezium MySQL plugin, and then creates or updates the `mysql-source` connector with the defaults from your `.env`. Override any parameter (for example `CONNECT_URL`, `MYSQL_HOST`, or `TOPIC_PREFIX`) by exporting the corresponding environment variable before running the script.
-
-Finally, validate the running Kafka Connect worker and connector directly from inside the container:
-
-```bash
-./scripts/check_debezium_connect.sh \
-  --container db-connect \
-  --connector-name mysql-source \
-  --show-config \
-  --validate-running
-```
-
-The validation script executes REST checks from inside the `db-connect` container, confirms the Debezium plugin is available, optionally validates the connector configuration, and reports a summary of pass/fail diagnostics. Add `--check-topics --kafka-container db-kafka` if you also want to confirm the internal Kafka topics.
+- `list_kafka_topics.sh` – Lists topics via the Kafka container.
+- `check_kafka_topic.sh` – Verifies the presence of a specific topic.
 
 ### Secondary VM
 
@@ -132,6 +115,8 @@ mysql-debezium-poc/
 ├─ primary/             # Debezium source stack (MySQL, Kafka, Kafka Connect, API)
 │  └─ scripts/          # Helper scripts for managing the source connector
 │     ├─ check_debezium_connect.sh
+│     ├─ check_kafka_topic.sh
+│     ├─ list_kafka_topics.sh
 │     └─ register_mysql_connector.sh
 ├─ secondary/           # JDBC sink stack (MySQL, Kafka Connect sink, API)
 └─ scripts/
