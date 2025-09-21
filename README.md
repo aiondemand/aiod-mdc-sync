@@ -76,6 +76,26 @@ Once the containers are running, **from the same directory** execute the verific
 
 The script checks Docker, the Compose plugin, the presence of the `.env` files, running containers (MySQL, Kafka, Kafka Connect), and the Kafka Connect REST API. Resolve any warnings before continuing.
 
+Next, register the Debezium MySQL source connector using the helper script inside the primary stack:
+
+```bash
+./scripts/register_mysql_connector.sh
+```
+
+The script waits for the Connect REST endpoint, verifies the Debezium MySQL plugin, and then creates or updates the `mysql-source` connector with the defaults from your `.env`. Override any parameter (for example `CONNECT_URL`, `MYSQL_HOST`, or `TOPIC_PREFIX`) by exporting the corresponding environment variable before running the script.
+
+Finally, validate the running Kafka Connect worker and connector directly from inside the container:
+
+```bash
+./scripts/check_debezium_connect.sh \
+  --container db-connect \
+  --connector-name mysql-source \
+  --show-config \
+  --validate-running
+```
+
+The validation script executes REST checks from inside the `db-connect` container, confirms the Debezium plugin is available, optionally validates the connector configuration, and reports a summary of pass/fail diagnostics. Add `--check-topics --kafka-container db-kafka` if you also want to confirm the internal Kafka topics.
+
 ### Secondary VM
 
 After the primary stack is healthy, start the secondary services:
@@ -110,6 +130,9 @@ You should see the item created on the primary VM. If not, review container logs
 mysql-debezium-poc/
 ├─ app/                 # Shared FastAPI application (CRUD for items)
 ├─ primary/             # Debezium source stack (MySQL, Kafka, Kafka Connect, API)
+│  └─ scripts/          # Helper scripts for managing the source connector
+│     ├─ check_debezium_connect.sh
+│     └─ register_mysql_connector.sh
 ├─ secondary/           # JDBC sink stack (MySQL, Kafka Connect sink, API)
 └─ scripts/
    └─ verify_setup.sh   # Post-start verification script (run on the primary VM)
