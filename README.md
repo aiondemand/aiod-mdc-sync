@@ -90,6 +90,14 @@ docker compose up -d --build
 
 The sink connector image automatically registers itself with Kafka Connect running on the primary VM.
 
+Validate the secondary setup by running the connector check script, which ensures the container, REST API, and connector status are healthy:
+
+```bash
+./scripts/check_sink_connector.sh --show-config
+```
+
+Add `--verbose` to print the raw status payload or `--timeout <seconds>` if the connector needs longer to come online.
+
 ## 4. Smoke test the data flow
 
 1. On the **primary VM**, create a sample item:
@@ -119,6 +127,8 @@ mysql-debezium-poc/
 │     ├─ list_kafka_topics.sh
 │     └─ register_mysql_connector.sh
 ├─ secondary/           # JDBC sink stack (MySQL, Kafka Connect sink, API)
+│  └─ scripts/
+│     └─ check_sink_connector.sh # Post-start health check for the JDBC sink connector
 └─ scripts/
    └─ verify_setup.sh   # Post-start verification script (run on the primary VM)
 ```
