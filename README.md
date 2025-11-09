@@ -2,22 +2,31 @@
 
 ## Overview
 
-This proof of concept validates an architecture where two MySQL databases run on different virtual machines that share the same network. Debezium captures changes from the primary database and streams them through Kafka so that the secondary database keeps a synchronized copy.
+This proof of concept demonstrates how Debezium and Kafka can replicate MySQL changes
+from a primary virtual machine to a secondary virtual machine that is connected over
+the public internet. Version 2 hardens the stack with TLS on the Kafka listener and
+introduces an automated end-to-end check so you can measure eventual consistency
+across the WAN link.
 
-- **Primary VM** – Hosts MySQL, Kafka, Kafka Connect (Debezium source) and the FastAPI app that writes into MySQL.
-- **Secondary VM** – Hosts MySQL, a Kafka Connect JDBC sink, and a FastAPI app that reads from the synchronized database.
+- **Primary VM** – Hosts MySQL, Kafka, Kafka Connect (Debezium source) and the
+  FastAPI application that inserts data into MySQL.
+- **Secondary VM** – Hosts MySQL, a Kafka Connect JDBC sink, and the FastAPI
+  application that reads the replicated data.
 
 ## Prerequisites
 
-Prepare **two Linux VMs** (or physical servers) that can reach each other over the network.
-
-Install on both machines:
+Prepare **two Linux VMs** (or physical servers) that can reach each other over the
+internet. Both machines need:
 
 - Docker Engine
 - Docker Compose plugin (the `docker compose` subcommand)
 - Git
+- OpenSSL (required for TLS assets)
+- An outbound path on TCP/9093 from the secondary to the primary
 
-> 💡 Use local/private IP addresses (for example `192.168.x.x`) when testing inside the same network. The primary VM's IP must be reachable from the secondary VM on ports `9093`, `8083`, and `3306`.
+> 🔐 Only expose TCP/9093 (Kafka over TLS) from the primary VM to the secondary
+> VM's public IP. Kafka Connect (port 8083) and MySQL (3306) remain private to each
+> host.
 
 ## 1. Clone the repository
 
@@ -28,11 +37,13 @@ git clone https://github.com/<your-org>/mysql-debezium-poc.git
 cd mysql-debezium-poc/mysql-debezium-poc
 ```
 
-The project folders of interest are now at `primary/`, `secondary/`, and `app/`. All subsequent commands assume you stay inside `mysql-debezium-poc/`.
+You will work with the `primary/`, `secondary/`, and `app/` directories. All
+instructions assume you remain inside `mysql-debezium-poc/`.
 
 ## 2. Configure environment files
 
-The services read configuration from `.env` files. Copy the provided examples and edit them with the same credentials on both machines.
+Copy the provided examples and edit them with identical credentials on both
+machines.
 
 ### Primary VM
 
@@ -43,8 +54,12 @@ cp .env.example .env
 
 Edit `primary/.env` and set:
 
-- `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` – Shared credentials that both VMs will use.
-- `PRIMARY_PUB_IP` – The reachable IP or DNS name of the primary VM (use the private address if both machines are on the same LAN).
+- `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` – Shared
+  MySQL credentials used by both stacks.
+- `PRIMARY_PUB_IP` – The public DNS name or IP address that the secondary VM can
+  reach.
+- `KAFKA_SSL_PASSWORD` – Password that protects the generated Kafka keystore and
+  truststore (store this securely).
 
 ### Secondary VM
 
@@ -53,67 +68,106 @@ cd secondary
 cp .env.example .env
 ```
 
-Edit `secondary/.env` and set the same MySQL credentials as the primary. Configure `PRIMARY_PUB_IP` with the **primary VM's** reachable IP/DNS so the sink connector can contact Kafka.
+Edit `secondary/.env` and set:
+
+- The same MySQL credentials you defined on the primary.
+- `BOOTSTRAP_SERVERS` – `<PRIMARY_PUB_IP>:9093` using the value from the primary
+  `.env` file.
+- Optionally adjust the TLS truststore path/password if you copy the artifacts to a
+  different location.
 
 Return to `mysql-debezium-poc/` when you finish editing on each VM.
 
-## 3. Start the stack
+## 3. Generate Kafka TLS material (primary VM)
 
-Always start the primary side first so that Kafka and Debezium are ready before the sink connects.
+Run the helper to create a small certificate authority, broker certificate, and
+client truststore. The script uses the variables from `primary/.env` by default.
 
-### Primary VM
+```bash
+./scripts/generate_kafka_tls.sh
+```
+
+The artifacts are written to:
+
+- `primary/secrets/` – Broker keystore, truststore, and CA certificate
+- `secondary/secrets/` – Client truststore and CA certificate to copy to the
+  secondary VM
+
+Copy the contents of `secondary/secrets/` to the secondary VM (for example with
+`scp`) and place them under `mysql-debezium-poc/secondary/secrets/`. Keep the
+password from `KAFKA_SSL_PASSWORD` handy—it becomes
+`CONNECT_SSL_TRUSTSTORE_PASSWORD` in `secondary/.env`.
+
+## 4. Lock down network access
+
+On the primary VM, restrict ingress so that only the secondary VM can reach
+`TCP/9093`:
+
+```bash
+# Example using ufw
+sudo ufw allow from <SECONDARY_PUBLIC_IP> to any port 9093 proto tcp
+sudo ufw enable
+```
+
+All other Kafka ports remain internal to Docker. Confirm that the secondary VM can
+reach the port via `openssl s_client -connect <PRIMARY_PUB_IP>:9093` (it should show
+an established TLS session signed by the generated CA).
+
+## 5. Start the primary stack
+
+Always start the primary side first so Kafka and Debezium are ready before the sink
+connects.
 
 ```bash
 cd primary
 docker compose up -d --build
 ```
 
-Once the containers are running, stay in the same directory and validate the setup in this order:
+Once containers are running, validate the setup in this order (still on the primary
+VM):
 
-1. `../../scripts/verify_setup.sh` – Confirms Docker/Compose, environment files, running containers, and the Kafka Connect REST API.
-2. `./scripts/register_mysql_connector.sh` – Waits for Kafka Connect, verifies the Debezium plugin, and applies the `mysql-source` connector configuration. Override defaults by exporting environment variables (for example `CONNECT_URL`, `MYSQL_HOST`, or `TOPIC_PREFIX`).
-3. `./scripts/check_debezium_connect.sh --container db-connect --connector-name mysql-source --show-config --validate-running` – Runs in the `db-connect` container to verify the worker, connector status, and configuration. Append `--check-topics --kafka-container db-kafka` to confirm internal Kafka topics.
+1. `../../scripts/verify_setup.sh` – Confirms Docker/Compose, environment files,
+   running containers, and the Kafka Connect REST API.
+2. `./scripts/register_mysql_connector.sh` – Deploys the Debezium source connector.
+3. `./scripts/check_debezium_connect.sh --container db-connect --connector-name mysql-source --show-config --validate-running`
+   – Verifies the worker status. Add `--check-topics --kafka-container db-kafka`
+   to confirm Kafka internal topics.
 
-Additional Kafka helpers are available under `primary/scripts/`:
+## 6. Start the secondary stack
 
-- `list_kafka_topics.sh` – Lists topics via the Kafka container.
-- `check_kafka_topic.sh` – Verifies the presence of a specific topic.
-
-### Secondary VM
-
-After the primary stack is healthy, start the secondary services:
+After the primary stack is healthy, move to the secondary VM:
 
 ```bash
 cd secondary
 docker compose up -d --build
 ```
 
-The sink connector image automatically registers itself with Kafka Connect running on the primary VM.
-
-Validate the secondary setup by running the connector check script, which ensures the container, REST API, and connector status are healthy:
+The sink connector container generates its own `connect-distributed.properties`
+including TLS settings. Validate the stack with:
 
 ```bash
 ./scripts/check_sink_connector.sh --show-config
 ```
 
-Add `--verbose` to print the raw status payload or `--timeout <seconds>` if the connector needs longer to come online.
+Add `--verbose` for raw connector status or `--timeout <seconds>` if the worker
+needs longer to initialise.
 
-## 4. Smoke test the data flow
+## 7. Validate cross-VM eventual consistency
 
-1. On the **primary VM**, create a sample item:
-   ```bash
-   curl -X POST \
-     -H "Content-Type: application/json" \
-     -d '{"name": "demo", "description": "created on primary"}' \
-     http://PRIMARY_VM_IP:8000/items
-   ```
+From either VM (the machine just needs network access to both APIs), run the helper
+that creates a record on the primary API and waits for it to appear on the secondary
+API:
 
-2. On the **secondary VM**, list synchronized items:
-   ```bash
-   curl http://SECONDARY_VM_IP:8001/items
-   ```
+```bash
+./scripts/internet_consistency_check.sh \
+  --primary http://<PRIMARY_PUB_IP>:8000 \
+  --secondary http://<SECONDARY_PUBLIC_OR_PRIVATE_IP>:8001 \
+  --timeout 180 --interval 5
+```
 
-You should see the item created on the primary VM. If not, review container logs with `docker compose logs` on each side.
+The script reports how many seconds it took for the item to replicate. A failure
+indicates connectivity or connector issues—check Docker logs on both VMs for more
+information.
 
 ## Repository structure
 
@@ -121,19 +175,27 @@ You should see the item created on the primary VM. If not, review container logs
 mysql-debezium-poc/
 ├─ app/                 # Shared FastAPI application (CRUD for items)
 ├─ primary/             # Debezium source stack (MySQL, Kafka, Kafka Connect, API)
-│  └─ scripts/          # Helper scripts for managing the source connector
-│     ├─ check_debezium_connect.sh
-│     ├─ check_kafka_topic.sh
-│     ├─ list_kafka_topics.sh
-│     └─ register_mysql_connector.sh
+│  └─ scripts/          # Helper scripts for the source connector
 ├─ secondary/           # JDBC sink stack (MySQL, Kafka Connect sink, API)
-│  └─ scripts/
-│     └─ check_sink_connector.sh # Post-start health check for the JDBC sink connector
+│  └─ scripts/          # Health checks for the sink connector
 └─ scripts/
-   └─ verify_setup.sh   # Post-start verification script (run on the primary VM)
+   ├─ generate_kafka_tls.sh      # Generates TLS artifacts for Kafka/Connect
+   ├─ internet_consistency_check.sh # Cross-VM replication smoke test
+   └─ verify_setup.sh            # Primary-side environment validation
 ```
+
+## Troubleshooting tips
+
+- Use `docker compose logs -f <service>` to inspect individual container logs.
+- `openssl s_client -connect <PRIMARY_PUB_IP>:9093` verifies the TLS certificate
+  chain from outside Docker.
+- `secondary/scripts/check_sink_connector.sh --verbose` shows connector errors if
+  the sink cannot reach Kafka or MySQL.
+- Rerun `scripts/generate_kafka_tls.sh --force` if you need to regenerate
+  certificates (remember to copy the new truststore to the secondary VM).
 
 ## Next steps
 
-- Use the verification script whenever you restart the primary stack to quickly confirm dependencies and connectivity.
-- Review `primary/debezium-source.json` and `secondary/jdbc-sink.json` if you need to adapt connector settings for additional tables or different topics.
+- Extend the connector configurations in `primary/debezium-source.json` and
+  `secondary/jdbc-sink.json` to cover more tables.
+- Integrate additional monitoring or alerting for production scenarios.

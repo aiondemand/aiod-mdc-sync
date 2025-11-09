@@ -103,6 +103,18 @@ else
     echo "WARNING: secondary/.env file not found"
 fi
 
+if [ -f "../primary/secrets/kafka.server.keystore.p12" ]; then
+    echo "Kafka TLS keystore found"
+else
+    echo "WARNING: Kafka TLS keystore missing (run scripts/generate_kafka_tls.sh)"
+fi
+
+if [ -f "../secondary/secrets/kafka.client.truststore.p12" ]; then
+    echo "Sink truststore found"
+else
+    echo "WARNING: Kafka client truststore missing on primary host"
+fi
+
 # Check Docker services
 echo -e "\nChecking Docker services..."
 if docker ps | grep -q "kafka"; then
