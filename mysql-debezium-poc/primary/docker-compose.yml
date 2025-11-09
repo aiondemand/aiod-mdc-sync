@@ -20,16 +20,25 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       # two listeners: INTERNAL for containers; EXTERNAL for host/public
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093
       # IMPORTANT: advertised INTERNAL must be the Docker **service name** (or an alias) reachable by other containers
       # Your service name is "kafka" (top-level key), so use kafka:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://${PRIMARY_PUB_IP}:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${PRIMARY_PUB_IP}:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,SSL:SSL
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka.server.keystore.p12
+      KAFKA_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_PASSWORD}
+      KAFKA_SSL_KEY_PASSWORD: ${KAFKA_SSL_PASSWORD}
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.server.truststore.p12
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_PASSWORD}
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: HTTPS
+      KAFKA_SSL_CLIENT_AUTH: "none"
     ports:
       - "9092:9092"   # optional for host access
       - "9093:9093"   # external listener for host/public
+    volumes:
+      - ./secrets:/etc/kafka/secrets:ro
     networks: [pocnet]
 
   redpanda-console:
