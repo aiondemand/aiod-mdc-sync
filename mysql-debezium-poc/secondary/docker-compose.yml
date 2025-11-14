@@ -49,8 +49,14 @@ services:
       CONNECT_CONSUMER_REQUEST_TIMEOUT_MS: 60000
       CONNECT_CONSUMER_SESSION_TIMEOUT_MS: 60000
       CONNECT_PRODUCER_MAX_BLOCK_MS: 60000
+      CONNECT_SECURITY_PROTOCOL: ${CONNECT_SECURITY_PROTOCOL:-SSL}
+      CONNECT_SSL_TRUSTSTORE_LOCATION: ${CONNECT_SSL_TRUSTSTORE_LOCATION:-/etc/kafka/secrets/kafka.client.truststore.p12}
+      CONNECT_SSL_TRUSTSTORE_PASSWORD: ${CONNECT_SSL_TRUSTSTORE_PASSWORD:-}
+      CONNECT_SSL_TRUSTSTORE_TYPE: ${CONNECT_SSL_TRUSTSTORE_TYPE:-PKCS12}
+      CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ${CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM:-HTTPS}
     volumes:
       - ./jdbc-sink.json:/tmp/sink.json:ro
+      - ./secrets:/etc/kafka/secrets:ro
     command:
       - bash
       - -lc
@@ -83,6 +89,39 @@ services:
           printf 'offset.storage.replication.factor=%s\n' "$${CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR:-1}"
           printf 'status.storage.replication.factor=%s\n' "$${CONNECT_STATUS_STORAGE_REPLICATION_FACTOR:-1}"
           printf 'plugin.path=%s\n' "$${CONNECT_PLUGIN_PATH:-/usr/share/confluent-hub-components}"
+          if [ -n "${CONNECT_SECURITY_PROTOCOL:-}" ]; then
+            printf 'security.protocol=%s\n' "$${CONNECT_SECURITY_PROTOCOL}"
+            printf 'producer.security.protocol=%s\n' "$${CONNECT_SECURITY_PROTOCOL}"
+            printf 'consumer.security.protocol=%s\n' "$${CONNECT_SECURITY_PROTOCOL}"
+          fi
+          if [ -n "${CONNECT_SSL_TRUSTSTORE_LOCATION:-}" ]; then
+            if [ ! -f "${CONNECT_SSL_TRUSTSTORE_LOCATION}" ]; then
+              echo "ERROR: Truststore ${CONNECT_SSL_TRUSTSTORE_LOCATION} missing" >&2
+              exit 4
+            fi
+            if [ "${CONNECT_SECURITY_PROTOCOL:-}" = "SSL" ] && [ -z "${CONNECT_SSL_TRUSTSTORE_PASSWORD:-}" ]; then
+              echo "ERROR: CONNECT_SSL_TRUSTSTORE_PASSWORD must be set when using SSL" >&2
+              exit 5
+            fi
+            printf 'ssl.truststore.location=%s\n' "$${CONNECT_SSL_TRUSTSTORE_LOCATION}"
+            printf 'producer.ssl.truststore.location=%s\n' "$${CONNECT_SSL_TRUSTSTORE_LOCATION}"
+            printf 'consumer.ssl.truststore.location=%s\n' "$${CONNECT_SSL_TRUSTSTORE_LOCATION}"
+            if [ -n "${CONNECT_SSL_TRUSTSTORE_PASSWORD:-}" ]; then
+              printf 'ssl.truststore.password=%s\n' "$${CONNECT_SSL_TRUSTSTORE_PASSWORD}"
+              printf 'producer.ssl.truststore.password=%s\n' "$${CONNECT_SSL_TRUSTSTORE_PASSWORD}"
+              printf 'consumer.ssl.truststore.password=%s\n' "$${CONNECT_SSL_TRUSTSTORE_PASSWORD}"
+            fi
+            if [ -n "${CONNECT_SSL_TRUSTSTORE_TYPE:-}" ]; then
+              printf 'ssl.truststore.type=%s\n' "$${CONNECT_SSL_TRUSTSTORE_TYPE}"
+              printf 'producer.ssl.truststore.type=%s\n' "$${CONNECT_SSL_TRUSTSTORE_TYPE}"
+              printf 'consumer.ssl.truststore.type=%s\n' "$${CONNECT_SSL_TRUSTSTORE_TYPE}"
+            fi
+            if [ -n "${CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM:-}" ]; then
+              printf 'ssl.endpoint.identification.algorithm=%s\n' "$${CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM}"
+              printf 'producer.ssl.endpoint.identification.algorithm=%s\n' "$${CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM}"
+              printf 'consumer.ssl.endpoint.identification.algorithm=%s\n' "$${CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM}"
+            fi
+          fi
         } > /tmp/connect-distributed.properties
 
         grep '^bootstrap.servers' /tmp/connect-distributed.properties
