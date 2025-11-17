@@ -3,7 +3,7 @@ set -euo pipefail
 
 # --- Config (env-overridable) ---
 CONNECT_URL="${CONNECT_URL:-http://localhost:8083}"
-NAME="${NAME:-mysql-source}"
+NAME="${NAME:-mysql-sink}"
 
 # MySQL (source)
 MYSQL_HOST="${MYSQL_HOST:-primary-mysql}"
