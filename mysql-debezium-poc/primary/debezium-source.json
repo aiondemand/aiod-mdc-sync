@@ -1,18 +1,18 @@
 {
-    "name": "mysql-sink",
-    "config": {
-      "connector.class": "io.debezium.connector.mysql.MySqlConnector",
-      "database.hostname": "primary-mysql",
-      "database.port": "3306",
-      "database.user": "test_user",
-      "database.password": "test_pass",
-      "database.server.id": "184001",
-      "database.server.name": "primary",
-      "database.include.list": "test_db",
-      "table.include.list": "test_db.items",
-      "include.schema.changes": "false",
-      "database.history.kafka.bootstrap.servers": "kafka:9092",
-      "database.history.kafka.topic": "schema-changes.test_db"
-    }
+  "name": "mysql-source-v2",
+  "config": {
+    "connector.class": "io.debezium.connector.mysql.MySqlConnector",
+    "database.hostname": "localhost",
+    "database.port": "3306",
+    "database.user": "test_user",
+    "database.password": "test_pass",
+    "database.server.id": "184001",
+    "topic.prefix": "primary",
+    "database.include.list": "test_db",
+    "table.include.list": "test_db.items",
+    "include.schema.changes": "false",
+    "schema.history.internal": "io.debezium.relational.history.MemorySchemaHistory",
+    "snapshot.mode": "when_needed",
+    "schema.history.internal.store.only.captured.tables.ddl": "true"
   }
-  
+}

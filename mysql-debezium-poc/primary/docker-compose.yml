@@ -4,53 +4,6 @@ networks:
   pocnet:
 
 services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    container_name: db-zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-    networks: [pocnet]
-
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: db-kafka
-    depends_on: [zookeeper]
-    env_file: .env
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # two listeners: INTERNAL for containers; EXTERNAL for host/public
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:9093
-      # IMPORTANT: advertised INTERNAL must be the Docker **service name** (or an alias) reachable by other containers
-      # Your service name is "kafka" (top-level key), so use kafka:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://${PRIMARY_PUB_IP}:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    ports:
-      - "9092:9092"   # optional for host access
-      - "9093:9093"   # external listener for host/public
-    networks: [pocnet]
-
-  redpanda-console:
-    image: redpandadata/console:latest
-    container_name: kafka-ui
-    depends_on: [kafka]
-    networks: [pocnet]
-    ports:
-      - "8081:8080"         # open http://localhost:8081
-    environment:
-      # Point the UI at your internal listener (reachable from this container)
-      KAFKA_BROKERS: kafka:9092
-
-      # Optional niceties (uncomment if you use these later)
-      # KAFKA_SASL_ENABLED: "false"
-      # KAFKA_TLS_ENABLED: "false"
-      # CONNECT_ENABLED: "true"
-      # CONNECT_CLUSTERS_0_NAME: source-connect
-      # CONNECT_CLUSTERS_0_ADDRESS: http://db-connect:8083
-
-
   primary-mysql:
     image: mysql:8.0
     container_name: db-mysql
@@ -66,7 +19,15 @@ services:
     ports: ["3306:3306"]
     networks: [pocnet]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p$$MYSQL_ROOT_PASSWORD"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-p$$MYSQL_ROOT_PASSWORD",
+        ]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -87,16 +48,35 @@ services:
   # Kafka Connect running Debezium source
   connect-src:
     image: quay.io/debezium/connect:2.6
-    container_name: db-connect 
-    depends_on: [kafka, primary-mysql]
-    networks: [pocnet]
+    container_name: db-connect
+    depends_on: [primary-mysql]
+    network_mode: host
+    dns: ["8.8.8.8", "8.8.4.4"]
     ports: ["8083:8083"]
     environment:
-      BOOTSTRAP_SERVERS: kafka:9092
+      BOOTSTRAP_SERVERS: pkc-921jm.us-east-2.aws.confluent.cloud:9092
       GROUP_ID: "1"
       CONFIG_STORAGE_TOPIC: dbz_config
+      CONFIG_STORAGE_REPLICATION_FACTOR: 3
+      CONFIG_STORAGE_PARTITIONS: 1
       OFFSET_STORAGE_TOPIC: dbz_offsets
+      OFFSET_STORAGE_REPLICATION_FACTOR: 3
+      OFFSET_STORAGE_PARTITIONS: 25
       STATUS_STORAGE_TOPIC: dbz_statuses
+      STATUS_STORAGE_REPLICATION_FACTOR: 3
+      STATUS_STORAGE_PARTITIONS: 5
+      # Confluent Cloud security settings - using producer/consumer/admin prefixes
+      CONNECT_SECURITY_PROTOCOL: SASL_SSL
+      CONNECT_SASL_MECHANISM: PLAIN
+      CONNECT_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="APIKEY" password="API SECRET";'
+      CONNECT_PRODUCER_SECURITY_PROTOCOL: SASL_SSL
+      CONNECT_PRODUCER_SASL_MECHANISM: PLAIN
+      CONNECT_PRODUCER_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="APIKEY" password="API SECRET";'
+      CONNECT_CONSUMER_SECURITY_PROTOCOL: SASL_SSL
+      CONNECT_CONSUMER_SASL_MECHANISM: PLAIN
+      CONNECT_CONSUMER_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="APIKEY" password="API SECRET";'
+      CONNECT_SESSION_TIMEOUT_MS: 45000
+      CONNECT_REQUEST_TIMEOUT_MS: 60000
       # Optional: converters & logging
       KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
@@ -106,4 +86,7 @@ services:
     volumes:
       - ./debezium-source.json:/tmp/connector.json:ro
       - ./connect-log4j.properties:/etc/kafka/connect-log4j.properties:ro
-    # No custom command: let the entrypoint start the worker
+      - ./connect-distributed.properties:/etc/kafka/connect-distributed.properties:ro
+      - ./scripts/register_connector.sh:/usr/local/bin/register_connector.sh:ro
+      - ./entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/custom-entrypoint.sh"]

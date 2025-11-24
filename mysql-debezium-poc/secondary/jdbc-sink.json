@@ -18,18 +18,15 @@
     "auto.create": "true",
     "auto.evolve": "true",
 
-    "transforms": "extract,ts_created,route",
+    "transforms": "extract,ts_created",
     "transforms.extract.type": "org.apache.kafka.connect.transforms.ExtractField$Value",
     "transforms.extract.field": "after",
-    "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
-    "transforms.route.regex": "^primary\\.test_db\\.(.*)$",
-    "transforms.route.replacement": "$1",
 
     "transforms.ts_created.type": "org.apache.kafka.connect.transforms.TimestampConverter$Value",
     "transforms.ts_created.field": "created_at",
     "transforms.ts_created.target.type": "Timestamp",
     "transforms.ts_created.format": "yyyy-MM-dd'T'HH:mm:ssX",
 
-    "table.name.format": "${topic}"
+    "table.name.format": "items"
   }
 }
