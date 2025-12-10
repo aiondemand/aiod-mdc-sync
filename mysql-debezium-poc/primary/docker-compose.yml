@@ -27,16 +27,21 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,SSL:SSL
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.server.keystore.p12
       KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka.server.keystore.p12
       KAFKA_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_PASSWORD}
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: kafka_keystore_creds
       KAFKA_SSL_KEY_PASSWORD: ${KAFKA_SSL_PASSWORD}
+      KAFKA_SSL_KEY_CREDENTIALS: kafka_key_creds
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.server.truststore.p12
       KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.server.truststore.p12
       KAFKA_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_PASSWORD}
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: kafka_truststore_creds
       KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: HTTPS
       KAFKA_SSL_CLIENT_AUTH: "none"
     ports:
-      - "9092:9092"   # optional for host access
-      - "9093:9093"   # external listener for host/public
+      - "9092:9092" # optional for host access
+      - "9093:9093" # external listener for host/public
     volumes:
       - ./secrets:/etc/kafka/secrets:ro
     networks: [pocnet]
@@ -47,7 +52,7 @@ services:
     depends_on: [kafka]
     networks: [pocnet]
     ports:
-      - "8081:8080"         # open http://localhost:8081
+      - "8081:8080" # open http://localhost:8081
     environment:
       # Point the UI at your internal listener (reachable from this container)
       KAFKA_BROKERS: kafka:9092
@@ -58,7 +63,6 @@ services:
       # CONNECT_ENABLED: "true"
       # CONNECT_CLUSTERS_0_NAME: source-connect
       # CONNECT_CLUSTERS_0_ADDRESS: http://db-connect:8083
-
 
   primary-mysql:
     image: mysql:8.0
@@ -75,7 +79,15 @@ services:
     ports: ["3306:3306"]
     networks: [pocnet]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p$$MYSQL_ROOT_PASSWORD"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-p$$MYSQL_ROOT_PASSWORD",
+        ]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -96,7 +108,7 @@ services:
   # Kafka Connect running Debezium source
   connect-src:
     image: quay.io/debezium/connect:2.6
-    container_name: db-connect 
+    container_name: db-connect
     depends_on: [kafka, primary-mysql]
     networks: [pocnet]
     ports: ["8083:8083"]
