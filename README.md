@@ -83,8 +83,10 @@ Return to `mysql-debezium-poc/` when you finish editing on each VM.
 Run the helper to create a small certificate authority, broker certificate, and
 client truststore. The script uses the variables from `primary/.env` by default.
 
+Use PRIMARY_PUB_IP as the public domain, ej. kf-aiod-dev.iti.es
+
 ```bash
-./scripts/generate_kafka_tls.sh
+./scripts/generate_kafka_tls.sh kf-aiod-dev.iti.es
 ```
 
 The artifacts are written to:
@@ -112,6 +114,10 @@ sudo ufw enable
 All other Kafka ports remain internal to Docker. Confirm that the secondary VM can
 reach the port via `openssl s_client -connect <PRIMARY_PUB_IP>:9093` (it should show
 an established TLS session signed by the generated CA).
+
+## 4.1 Check that public port is reachable from outside
+
+Check that KAFKA_ADVERTISED_LISTENERS variable is using the current public port. In our POC, we made a redirection from 50010 to 9093 and the following parameter had to be changed: KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${PRIMARY_PUB_IP}:9093 50010.
 
 ## 5. Start the primary stack
 
