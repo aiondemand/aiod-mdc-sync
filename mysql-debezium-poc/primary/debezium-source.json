@@ -1,5 +1,5 @@
 {
-    "name": "mysql-source",
+    "name": "mysql-sink",
     "config": {
       "connector.class": "io.debezium.connector.mysql.MySqlConnector",
       "database.hostname": "primary-mysql",
