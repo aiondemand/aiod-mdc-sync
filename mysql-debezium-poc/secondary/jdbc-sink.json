@@ -1,10 +1,10 @@
 {
-  "name": "mysql-sink",
+  "name": "mysql-source",
   "config": {
     "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
     "tasks.max": "1",
 
-    "topics": "primary.test_db.items",
+    "topics.regex": "primary\\.test_db\\..*",
 
     "connection.url": "jdbc:mysql://secondary-mysql:3306/test_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC",
     "connection.user": "test_user",
@@ -17,6 +17,7 @@
     "behavior.on.null.values": "delete",
     "auto.create": "true",
     "auto.evolve": "true",
+    "auto.schema.update": "true",
 
     "transforms": "extract,ts_created,route",
     "transforms.extract.type": "org.apache.kafka.connect.transforms.ExtractField$Value",

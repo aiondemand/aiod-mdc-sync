@@ -24,7 +24,7 @@ SECONDARY_SECRETS="$REPO_ROOT/mysql-debezium-poc/secondary/secrets"
 
 [[ -f "$PRIMARY_ENV" ]] && set -a && source "$PRIMARY_ENV" && set +a
 
-PUBLIC_ADDR="${PRIMARY_PUB_IP:-}"
+PUBLIC_ADDR="${PRIMARY_PUB_IP:-kf-aiod-dev.iti.es}"
 PASSWORD="${KAFKA_SSL_PASSWORD:-changeit}"
 EXTRA_SAN=()
 FORCE=false

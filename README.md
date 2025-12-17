@@ -134,7 +134,9 @@ VM):
 
 1. `../../scripts/verify_setup.sh` – Confirms Docker/Compose, environment files,
    running containers, and the Kafka Connect REST API.
-2. `./scripts/register_mysql_connector.sh` – Deploys the Debezium source connector.
+2. `./scripts/register_mysql_connector.sh` – Deploys the Debezium source connector. There are two key parameters to be configured: 
+TABLES="${TABLES:-test_db.*} .*
+INCLUDE_SCHEMA_CHANGES="${INCLUDE_SCHEMA_CHANGES:-true}"
 3. `./scripts/check_debezium_connect.sh --container db-connect --connector-name mysql-source --show-config --validate-running`
    – Verifies the worker status. Add `--check-topics --kafka-container db-kafka`
    to confirm Kafka internal topics.
