@@ -46,6 +46,52 @@ services:
       - ./secrets:/etc/kafka/secrets:ro
     networks: [pocnet]
 
+  # Initialize Kafka Connect topics with correct cleanup policy
+  kafka-setup:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-setup
+    depends_on: [kafka]
+    networks: [pocnet]
+    command:
+      - bash
+      - -c
+      - |
+        echo "Waiting for Kafka to be ready..."
+        cub kafka-ready -b kafka:9092 1 60
+
+        echo "Creating Debezium Connect internal topics with cleanup.policy=compact..."
+
+        # Debezium source connector topics
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+          --topic dbz_config --replication-factor 1 --partitions 1 \
+          --config cleanup.policy=compact || true
+
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+          --topic dbz_offsets --replication-factor 1 --partitions 25 \
+          --config cleanup.policy=compact || true
+
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+          --topic dbz_statuses --replication-factor 1 --partitions 5 \
+          --config cleanup.policy=compact || true
+
+        # Sink connector topics (for secondary)
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+          --topic sink_config --replication-factor 1 --partitions 1 \
+          --config cleanup.policy=compact || true
+
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+          --topic sink_offsets --replication-factor 1 --partitions 25 \
+          --config cleanup.policy=compact || true
+
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+          --topic sink_status --replication-factor 1 --partitions 5 \
+          --config cleanup.policy=compact || true
+
+        echo "Kafka Connect topics created successfully"
+        echo "Listing all topics:"
+        kafka-topics --bootstrap-server kafka:9092 --list
+    restart: "no"
+
   redpanda-console:
     image: redpandadata/console:latest
     container_name: kafka-ui
@@ -109,7 +155,11 @@ services:
   connect-src:
     image: quay.io/debezium/connect:2.6
     container_name: db-connect
-    depends_on: [kafka, primary-mysql]
+    depends_on:
+      kafka-setup:
+        condition: service_completed_successfully
+      primary-mysql:
+        condition: service_started
     networks: [pocnet]
     ports: ["8083:8083"]
     environment:
