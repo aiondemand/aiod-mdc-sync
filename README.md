@@ -100,7 +100,9 @@ Copy the contents of `secondary/secrets/` to the secondary VM (for example with
 password from `KAFKA_SSL_PASSWORD` handy—it becomes
 `CONNECT_SSL_TRUSTSTORE_PASSWORD` in `secondary/.env`.
 
-## 4. Lock down network access
+## 4. Network configuration
+
+### 4.1 Lock down network access
 
 On the primary VM, restrict ingress so that only the secondary VM can reach
 `TCP/9093`:
@@ -115,9 +117,26 @@ All other Kafka ports remain internal to Docker. Confirm that the secondary VM c
 reach the port via `openssl s_client -connect <PRIMARY_PUB_IP>:9093` (it should show
 an established TLS session signed by the generated CA).
 
-## 4.1 Check that public port is reachable from outside
+### 4.2 Check that public port is reachable from outside
 
 Check that KAFKA_ADVERTISED_LISTENERS variable is using the current public port. In our POC, we made a redirection from 50010 to 9093 and the following parameter had to be changed: KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${PRIMARY_PUB_IP}:9093 50010.
+
+### 4.3 Configure NGnix for external Kafka access
+
+For external (internet) access to the Kafka broker, configure NGnix to proxy the
+TLS stream so clients can reach `9093` while the broker stays on the private IP.
+This keeps the broker address stable and avoids exposing Docker networking
+directly to the internet.
+
+```nginx
+stream {
+        server {
+                listen 0.0.0.0:9093;
+                proxy_pass 10.151.16.160:9093;
+                ssl_preread on;
+        }
+}
+```
 
 ## 5. Start the primary stack
 
