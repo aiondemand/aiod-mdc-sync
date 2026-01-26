@@ -7,7 +7,7 @@ services:
     container_name: "secondary-mysql"
     env_file: .env
     command: --server-id=2 --default-authentication-plugin=mysql_native_password
-    ports: ["3306:3306"]
+    ports: ["3308:3308"]
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks: [pocnet]
@@ -20,7 +20,7 @@ services:
     env_file: .env
     environment:
       DB_HOST: secondary-mysql
-      DB_PORT: 3306
+      DB_PORT: 3308
     ports: ["8001:8001"]
     command: ["--port", "8001"]
     networks: [pocnet]
@@ -29,8 +29,10 @@ services:
     build: .
     container_name: connect-sink
     env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks: [pocnet]
-    ports: ["8083:8083"]
+    ports: ["8084:8084"]
     restart: unless-stopped
     environment:
       CONNECT_GROUP_ID: sink
@@ -48,14 +50,8 @@ services:
       CONNECT_CONSUMER_REQUEST_TIMEOUT_MS: 60000
       CONNECT_CONSUMER_SESSION_TIMEOUT_MS: 60000
       CONNECT_PRODUCER_MAX_BLOCK_MS: 60000
-      CONNECT_SECURITY_PROTOCOL: ${CONNECT_SECURITY_PROTOCOL:-SSL}
-      CONNECT_SSL_TRUSTSTORE_LOCATION: ${CONNECT_SSL_TRUSTSTORE_LOCATION:-/etc/kafka/secrets/kafka.client.truststore.p12}
-      CONNECT_SSL_TRUSTSTORE_PASSWORD: ${CONNECT_SSL_TRUSTSTORE_PASSWORD:-}
-      CONNECT_SSL_TRUSTSTORE_TYPE: ${CONNECT_SSL_TRUSTSTORE_TYPE:-PKCS12}
-      CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ${CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM:-HTTPS}
     volumes:
       - ./jdbc-sink.json:/tmp/sink.json:ro
-      - ./secrets:/etc/kafka/secrets:ro
     command:
       - bash
       - -lc
@@ -88,51 +84,9 @@ services:
           printf 'offset.storage.replication.factor=%s\n' "$${CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR:-1}"
           printf 'status.storage.replication.factor=%s\n' "$${CONNECT_STATUS_STORAGE_REPLICATION_FACTOR:-1}"
           printf 'plugin.path=%s\n' "$${CONNECT_PLUGIN_PATH:-/usr/share/confluent-hub-components}"
-          if [ -n "${CONNECT_SECURITY_PROTOCOL:-}" ]; then
-            printf 'security.protocol=%s\n' "$${CONNECT_SECURITY_PROTOCOL}"
-            printf 'producer.security.protocol=%s\n' "$${CONNECT_SECURITY_PROTOCOL}"
-            printf 'consumer.security.protocol=%s\n' "$${CONNECT_SECURITY_PROTOCOL}"
-            printf 'admin.security.protocol=%s\n' "$${CONNECT_SECURITY_PROTOCOL}"
-          fi
-          if [ -n "${CONNECT_SSL_TRUSTSTORE_LOCATION:-}" ]; then
-            if [ ! -f "${CONNECT_SSL_TRUSTSTORE_LOCATION}" ]; then
-              echo "ERROR: Truststore ${CONNECT_SSL_TRUSTSTORE_LOCATION} missing" >&2
-              exit 4
-            fi
-            if [ "${CONNECT_SECURITY_PROTOCOL:-}" = "SSL" ] && [ -z "${CONNECT_SSL_TRUSTSTORE_PASSWORD:-}" ]; then
-              echo "ERROR: CONNECT_SSL_TRUSTSTORE_PASSWORD must be set when using SSL" >&2
-              exit 5
-            fi
-            printf 'ssl.truststore.location=%s\n' "$${CONNECT_SSL_TRUSTSTORE_LOCATION}"
-            printf 'producer.ssl.truststore.location=%s\n' "$${CONNECT_SSL_TRUSTSTORE_LOCATION}"
-            printf 'consumer.ssl.truststore.location=%s\n' "$${CONNECT_SSL_TRUSTSTORE_LOCATION}"
-            printf 'admin.ssl.truststore.location=%s\n' "$${CONNECT_SSL_TRUSTSTORE_LOCATION}"
-            if [ -n "${CONNECT_SSL_TRUSTSTORE_PASSWORD:-}" ]; then
-              printf 'ssl.truststore.password=%s\n' "$${CONNECT_SSL_TRUSTSTORE_PASSWORD}"
-              printf 'producer.ssl.truststore.password=%s\n' "$${CONNECT_SSL_TRUSTSTORE_PASSWORD}"
-              printf 'consumer.ssl.truststore.password=%s\n' "$${CONNECT_SSL_TRUSTSTORE_PASSWORD}"
-              printf 'admin.ssl.truststore.password=%s\n' "$${CONNECT_SSL_TRUSTSTORE_PASSWORD}"
-            fi
-            if [ -n "${CONNECT_SSL_TRUSTSTORE_TYPE:-}" ]; then
-              printf 'ssl.truststore.type=%s\n' "$${CONNECT_SSL_TRUSTSTORE_TYPE}"
-              printf 'producer.ssl.truststore.type=%s\n' "$${CONNECT_SSL_TRUSTSTORE_TYPE}"
-              printf 'consumer.ssl.truststore.type=%s\n' "$${CONNECT_SSL_TRUSTSTORE_TYPE}"
-              printf 'admin.ssl.truststore.type=%s\n' "$${CONNECT_SSL_TRUSTSTORE_TYPE}"
-            fi
-            # Always set endpoint identification (empty = disabled, allows advertised listener mismatches)
-            printf 'ssl.endpoint.identification.algorithm=%s\n' "$${CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM:-}"
-            printf 'producer.ssl.endpoint.identification.algorithm=%s\n' "$${CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM:-}"
-            printf 'consumer.ssl.endpoint.identification.algorithm=%s\n' "$${CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM:-}"
-            printf 'admin.ssl.endpoint.identification.algorithm=%s\n' "$${CONNECT_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM:-}"
-          fi
         } > /tmp/connect-distributed.properties
 
         grep '^bootstrap.servers' /tmp/connect-distributed.properties
-
-        # 3.5) Wait for Kafka Connect topics to be available (created by primary)
-        echo "Waiting for Kafka Connect internal topics to be available..."
-        echo "NOTE: These topics should be created by the primary Kafka broker"
-        sleep 5
 
         # 4) Start Connect using our file
         connect-distributed /tmp/connect-distributed.properties &
@@ -142,8 +96,8 @@ services:
         curl -fsS http://localhost:8083/ >/dev/null || { echo "ERROR: REST not ready after 300s"; exit 3; }
 
         # 6) Idempotent registration
-        curl -fsS http://localhost:8083/connectors/mysql-source >/dev/null || \
-          curl -fsS -X POST -H 'Content-Type: application/json' --data @/tmp/sink.json http://localhost:8083/connectors
+        curl -fsS http://localhost:8083/connectors/mysql-sink >/dev/null || \
+          curl -fsS -X POST -H 'Content-Type: application/json' --data @/tmp/sink.json http://localhost:8083/connectors || true
 
         # 7) Keep container alive
         tail -f /dev/null

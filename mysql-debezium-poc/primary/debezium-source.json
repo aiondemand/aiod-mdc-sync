@@ -2,16 +2,15 @@
   "name": "mysql-source",
   "config": {
     "connector.class": "io.debezium.connector.mysql.MySqlConnector",
-    "database.hostname": "primary-mysql",
-    "database.port": "3306",
-    "database.user": "test_user",
-    "database.password": "test_pass",
+    "database.hostname": "hostname",
+    "database.port": "port",
+    "database.user": "user",
+    "database.password": "password",
     "database.server.id": "184001",
-    "database.server.name": "primary",
-    "database.include.list": "test_db",
-    "table.include.list": "test_db.*",
+    "database.server.name": "aiod",
+    "database.include.list": "aiod",
     "include.schema.changes": "true",
     "database.history.kafka.bootstrap.servers": "kafka:9092",
-    "database.history.kafka.topic": "schema-changes.test_db"
+    "database.history.kafka.topic": "schema-changes.aiod"
   }
 }
