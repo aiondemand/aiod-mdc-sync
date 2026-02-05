@@ -23,74 +23,14 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093
       # IMPORTANT: advertised INTERNAL must be the Docker **service name** (or an alias) reachable by other containers
       # Your service name is "kafka" (top-level key), so use kafka:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${PRIMARY_PUB_IP}:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,SSL:SSL
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${PRIMARY_PUB_IP}:50010
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,SSL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_SSL_KEYSTORE_FILENAME: kafka.server.keystore.p12
-      KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka.server.keystore.p12
-      KAFKA_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_PASSWORD}
-      KAFKA_SSL_KEYSTORE_CREDENTIALS: kafka_keystore_creds
-      KAFKA_SSL_KEY_PASSWORD: ${KAFKA_SSL_PASSWORD}
-      KAFKA_SSL_KEY_CREDENTIALS: kafka_key_creds
-      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.server.truststore.p12
-      KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.server.truststore.p12
-      KAFKA_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_PASSWORD}
-      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: kafka_truststore_creds
-      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: HTTPS
-      KAFKA_SSL_CLIENT_AUTH: "none"
     ports:
       - "9092:9092" # optional for host access
       - "9093:9093" # external listener for host/public
-    volumes:
-      - ./secrets:/etc/kafka/secrets:ro
     networks: [pocnet]
-
-  # Initialize Kafka Connect topics with correct cleanup policy
-  kafka-setup:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: kafka-setup
-    depends_on: [kafka]
-    networks: [pocnet]
-    command:
-      - bash
-      - -c
-      - |
-        echo "Waiting for Kafka to be ready..."
-        cub kafka-ready -b kafka:9092 1 60
-
-        echo "Creating Debezium Connect internal topics with cleanup.policy=compact..."
-
-        # Debezium source connector topics
-        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
-          --topic dbz_config --replication-factor 1 --partitions 1 \
-          --config cleanup.policy=compact || true
-
-        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
-          --topic dbz_offsets --replication-factor 1 --partitions 25 \
-          --config cleanup.policy=compact || true
-
-        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
-          --topic dbz_statuses --replication-factor 1 --partitions 5 \
-          --config cleanup.policy=compact || true
-
-        # Sink connector topics (for secondary)
-        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
-          --topic sink_config --replication-factor 1 --partitions 1 \
-          --config cleanup.policy=compact || true
-
-        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
-          --topic sink_offsets --replication-factor 1 --partitions 25 \
-          --config cleanup.policy=compact || true
-
-        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
-          --topic sink_status --replication-factor 1 --partitions 5 \
-          --config cleanup.policy=compact || true
-
-        echo "Kafka Connect topics created successfully"
-        echo "Listing all topics:"
-        kafka-topics --bootstrap-server kafka:9092 --list
-    restart: "no"
 
   redpanda-console:
     image: redpandadata/console:latest
@@ -122,7 +62,7 @@ services:
       - --binlog_expire_logs_seconds=604800
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports: ["3306:3306"]
+    ports: ["3309:3309"]
     networks: [pocnet]
     healthcheck:
       test:
@@ -138,30 +78,15 @@ services:
       timeout: 3s
       retries: 20
 
-  primary-api:
-    build:
-      context: ../app
-    container_name: db-api
-    depends_on: [primary-mysql]
-    env_file: .env
-    environment:
-      DB_HOST: primary-mysql
-      DB_PORT: 3306
-    ports: ["8000:8000"]
-    command: ["--port", "8000"]
-    networks: [pocnet]
-
   # Kafka Connect running Debezium source
   connect-src:
     image: quay.io/debezium/connect:2.6
     container_name: db-connect
-    depends_on:
-      kafka-setup:
-        condition: service_completed_successfully
-      primary-mysql:
-        condition: service_started
+    depends_on: [kafka, primary-mysql]
     networks: [pocnet]
     ports: ["8083:8083"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
       GROUP_ID: "1"

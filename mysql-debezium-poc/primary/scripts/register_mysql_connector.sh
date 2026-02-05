@@ -3,26 +3,26 @@ set -euo pipefail
 
 # --- Config (env-overridable) ---
 CONNECT_URL="${CONNECT_URL:-http://localhost:8083}"
-NAME="${NAME:-mysql-sink}"
+NAME="${NAME:-mysql-source}"
 
 # MySQL (source)
-MYSQL_HOST="${MYSQL_HOST:-primary-mysql}"
+MYSQL_HOST="${MYSQL_HOST:-host.docker.internal}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
-MYSQL_USER="${MYSQL_USER:-test_user}"
-MYSQL_PASSWORD="${MYSQL_PASSWORD:-test_pass}"
+MYSQL_USER="${MYSQL_USER:-root}"
+MYSQL_PASSWORD="${MYSQL_PASSWORD:-ok}"
 
 # Debezium connector
 SERVER_ID="${SERVER_ID:-184001}"
 TOPIC_PREFIX="${TOPIC_PREFIX:-primary}"
-DATABASE="${DATABASE:-test_db}"
-TABLES="${TABLES:-test_db.*}"
+DATABASE="${DATABASE:-aiod}"
+TABLES="${TABLES:-aiod.*}"
 INCLUDE_SCHEMA_CHANGES="${INCLUDE_SCHEMA_CHANGES:-true}"
 SNAPSHOT_MODE="${SNAPSHOT_MODE:-initial}"
 SNAPSHOT_LOCKING_MODE="${SNAPSHOT_LOCKING_MODE:-}"   # optional
 
 # Kafka as seen FROM THE CONNECT CONTAINER
 KAFKA_BOOTSTRAP="${KAFKA_BOOTSTRAP:-kafka:9092}"
-HISTORY_TOPIC="${HISTORY_TOPIC:-schema-changes.test_db}"
+HISTORY_TOPIC="${HISTORY_TOPIC:-schema-changes.aiod}"
 
 # (Optional) container name for reachability checks to Kafka
 CONTAINER="${CONTAINER:-}"
