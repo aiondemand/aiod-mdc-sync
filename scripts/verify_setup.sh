@@ -48,7 +48,7 @@ else
     OS=$(uname -s)
 fi
 
-echo "Verifying Debezium PoC Setup..."
+echo "Verifying Debezium project setup..."
 echo "==============================="
 
 # Check Docker installation and permissions
@@ -87,10 +87,10 @@ fi
 
 # Check environment files
 echo -e "\nChecking environment files..."
-if [ -f "../mysql-debezium-poc/primary/.env" ]; then
+if [ -f "../mysql-debezium/primary/.env" ]; then
     echo "PRIMARY .env file exists"
     # Check for required variables
-    if grep -q "PRIMARY_PUB_IP" "../mysql-debezium-poc/primary/.env"; then
+    if grep -q "PRIMARY_PUB_IP" "../mysql-debezium/primary/.env"; then
         echo "PRIMARY_PUB_IP is configured"
     else
         echo "WARNING: PRIMARY_PUB_IP not found in primary/.env"
@@ -99,7 +99,7 @@ else
     echo "WARNING: primary/.env file not found"
 fi
 
-if [ -f "../mysql-debezium-poc/secondary/.env" ]; then
+if [ -f "../mysql-debezium/secondary/.env" ]; then
     echo "SECONDARY .env file exists"
 else
     echo "WARNING: secondary/.env file not found"

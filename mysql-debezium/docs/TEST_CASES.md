@@ -18,9 +18,9 @@ Steps performed:
    - `KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.server.truststore.p12`
    - `KAFKA_SSL_TRUSTSTORE_CREDENTIALS: kafka_truststore_creds`
 
-3. Copy the files from `secondary/secrets/` to the secondary VM (for example with `scp`) into `mysql-debezium-poc/secondary/secrets/`.
+3. Copy the files from `secondary/secrets/` to the secondary VM (for example with `scp`) into `mysql-debezium/secondary/secrets/`.
 
-4. Ensure `KAFKA_ADVERTISED_LISTENERS` advertises the public address/port. In our POC we forwarded host port `50010` to container `9093`; the advertised listeners looked like:
+4. Ensure `KAFKA_ADVERTISED_LISTENERS` advertises the public address/port. In our project we forwarded host port `50010` to container `9093`; the advertised listeners looked like:
    `PLAINTEXT://kafka:9092,SSL://${PRIMARY_PUB_IP}:9093`
 
 ## Delete rows (#34) — ✅
@@ -62,7 +62,7 @@ Considerations:
 - To retain compacted state instead of time-based deletion, set `cleanup.policy=compact` so the latest value per key is retained indefinitely (useful for long-term resynchronization).
 
 
-## Extend the PoC to the AiOD REST API Synchronization (#33) — ✅
+## Extend the project to the AiOD REST API Synchronization (#33) — ✅
 
 The goal of this task was to:
 
@@ -77,7 +77,7 @@ Automate the generation of Debezium source table configurations, supporting exte
                                           "database.include.list": "aiod",
                                           "database.history.kafka.topic": "schema-changes.aiod"
       - secondary/jbdc-sink.json:     "topics.regex": "primary\\.aiod\\..*",
-                                       "connection.url": "jdbc:mysql://host.docker.internal:3307/aiod?sessionVariables=foreign_key_checks=0",
+                                       "connection.url": "jdbc:mysql://host.docker.internal:3307/aiod?sessionVariables=foreign_key_checks=0"
 Primary node will publish on kafka all changes made on all tables:
                                        ai4europe-worker-1:~$  docker exec -i db-kafka bash -lc 'kafka-topics --bootstrap-server kafka:9092 --list'
                                        __consumer_offsets

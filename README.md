@@ -1,8 +1,8 @@
-# Debezium MySQL PoC
+# Debezium MySQL project
 
 ## Overview
 
-This proof of concept demonstrates how Debezium and Kafka can replicate MySQL changes
+This project demonstrates how Debezium and Kafka can replicate MySQL changes
 from a primary virtual machine to a secondary virtual machine that is connected over
 the public internet. Version 2 hardens the stack with TLS on the Kafka listener and
 introduces an automated end-to-end check so you can measure eventual consistency
@@ -12,6 +12,40 @@ across the WAN link.
   FastAPI application that inserts data into MySQL.
 - **Secondary VM** – Hosts MySQL, a Kafka Connect JDBC sink, and the FastAPI
   application that reads the replicated data.
+
+## AIOD Catalogue Configuration
+
+This section documents the standalone setup for the AIOD Catalogue nodes. Keep the
+existing `primary/` and `secondary/` folders as the concrete targets for each node:
+`primary/` holds the source side and `secondary/` holds the sink side. The same
+scripts can be reused across different AIOD deployments, but the folder mapping
+remains the same.
+
+### Primary Node (`primary/`)
+
+Use this side when you want to run the AIOD Catalogue MySQL instance as the source
+of truth.
+
+- Configure the environment in `primary/.env`.
+- Use `primary/scripts/register_mysql_connector.sh` to create or update the Debezium
+  source connector.
+- Keep the topic prefix, database name, and history topic aligned with the catalogue
+  database you want to track.
+- Start the services from the `primary/` folder with `docker compose up -d --build`.
+- Validate the source connector with `primary/scripts/check_debezium_connect.sh`.
+
+### Secondary Node (`secondary/`)
+
+Use this side when you want a second AIOD Catalogue node to consume the changes
+published by the primary.
+
+- Configure the environment in `secondary/.env`.
+- Use `secondary/scripts/check_sink_connector.sh` to validate the JDBC sink.
+- Point `BOOTSTRAP_SERVERS` to the primary node Kafka endpoint.
+- Keep the sink topic filters aligned with the catalogue topic prefix.
+- Start the services from the `secondary/` folder with `docker compose up -d --build`.
+- Validate replication by running `scripts/internet_consistency_check.sh` once both
+  nodes are up.
 
 ## Prerequisites
 
@@ -33,12 +67,12 @@ internet. Both machines need:
 Run on **each VM**:
 
 ```bash
-git clone https://github.com/<your-org>/mysql-debezium-poc.git
-cd mysql-debezium-poc/mysql-debezium-poc
+git clone https://github.com/aiondemand/aiod-mdc-sync.git
+cd aiod-mdc-sync/aiod-mdc-sync
 ```
 
 You will work with the `primary/`, `secondary/`, and `app/` directories. All
-instructions assume you remain inside `mysql-debezium-poc/`.
+instructions assume you remain inside `aiod-mdc-sync/`.
 
 ## 2. Configure environment files
 
@@ -76,7 +110,7 @@ Edit `secondary/.env` and set:
 - Optionally adjust the TLS truststore path/password if you copy the artifacts to a
   different location.
 
-Return to `mysql-debezium-poc/` when you finish editing on each VM.
+Return to `aiod-mdc-sync/` when you finish editing on each VM.
 
 ## 3. Generate Kafka TLS material (primary VM)
 
@@ -96,7 +130,7 @@ The artifacts are written to:
   secondary VM
 
 Copy the contents of `secondary/secrets/` to the secondary VM (for example with
-`scp`) and place them under `mysql-debezium-poc/secondary/secrets/`. Keep the
+`scp`) and place them under `aiod-mdc-sync/secondary/secrets/`. Keep the
 password from `KAFKA_SSL_PASSWORD` handy—it becomes
 `CONNECT_SSL_TRUSTSTORE_PASSWORD` in `secondary/.env`.
 
@@ -119,7 +153,7 @@ an established TLS session signed by the generated CA).
 
 ### 4.2 Check that public port is reachable from outside
 
-Check that KAFKA_ADVERTISED_LISTENERS variable is using the current public port. In our POC, we made a redirection from 50010 to 9093 and the following parameter had to be changed: KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${PRIMARY_PUB_IP}:9093 50010.
+Check that KAFKA_ADVERTISED_LISTENERS variable is using the current public port. In our project, we made a redirection from 50010 to 9093 and the following parameter had to be changed: KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,SSL://${PRIMARY_PUB_IP}:9093 50010.
 
 ### 4.3 Configure NGnix for external Kafka access
 
@@ -199,7 +233,7 @@ information.
 ## Repository structure
 
 ```
-mysql-debezium-poc/
+aiod-mdc-sync/
 ├─ app/                 # Shared FastAPI application (CRUD for items)
 ├─ primary/             # Debezium source stack (MySQL, Kafka, Kafka Connect, API)
 │  └─ scripts/          # Helper scripts for the source connector
@@ -218,11 +252,9 @@ mysql-debezium-poc/
   chain from outside Docker.
 - `secondary/scripts/check_sink_connector.sh --verbose` shows connector errors if
   the sink cannot reach Kafka or MySQL.
+
+## Test Cases
+
+Detailed test cases and validation notes are documented in [TEST_CASES.md](aiod-mdc-sync/docs/TEST_CASES.md).
 - Rerun `scripts/generate_kafka_tls.sh --force` if you need to regenerate
   certificates (remember to copy the new truststore to the secondary VM).
-
-## Next steps
-
-- Extend the connector configurations in `primary/debezium-source.json` and
-  `secondary/jdbc-sink.json` to cover more tables.
-- Integrate additional monitoring or alerting for production scenarios.

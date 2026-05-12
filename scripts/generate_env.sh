@@ -41,7 +41,7 @@ fi
 
 # Define paths
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_DIR="$BASE_DIR/mysql-debezium-poc/$ROLE"
+SOURCE_DIR="$BASE_DIR/mysql-debezium/$ROLE"
 ENV_EXAMPLE="$SOURCE_DIR/.env.example"
 ENV_FILE="$SOURCE_DIR/.env"
 
