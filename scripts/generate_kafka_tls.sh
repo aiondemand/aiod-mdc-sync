@@ -6,11 +6,11 @@ usage() {
 Usage: ${0##*/} [--public-address <IP-or-DNS>] [--password <pass>] [--san <extraSAN>] [--force]
 
 Creates a small certificate authority, Kafka broker certificate, and client truststore
-for the Debezium PoC. By default the script reads PRIMARY_PUB_IP and KAFKA_SSL_PASSWORD
+for the Debezium project. By default the script reads PRIMARY_PUB_IP and KAFKA_SSL_PASSWORD
 from primary/.env if present. Use --public-address to override the SAN advertised to
 remote clients. Certificates are written to:
-  mysql-debezium-poc/primary/secrets/
-  mysql-debezium-poc/secondary/secrets/
+  mysql-debezium/primary/secrets/
+  mysql-debezium/secondary/secrets/
 
 Re-run with --force to overwrite existing material.
 USAGE
@@ -18,9 +18,9 @@ USAGE
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PRIMARY_ENV="$REPO_ROOT/mysql-debezium-poc/primary/.env"
-PRIMARY_SECRETS="$REPO_ROOT/mysql-debezium-poc/primary/secrets"
-SECONDARY_SECRETS="$REPO_ROOT/mysql-debezium-poc/secondary/secrets"
+PRIMARY_ENV="$REPO_ROOT/mysql-debezium/primary/.env"
+PRIMARY_SECRETS="$REPO_ROOT/mysql-debezium/primary/secrets"
+SECONDARY_SECRETS="$REPO_ROOT/mysql-debezium/secondary/secrets"
 
 [[ -f "$PRIMARY_ENV" ]] && set -a && source "$PRIMARY_ENV" && set +a
 
@@ -122,7 +122,7 @@ done
 # 1) Create a simple certificate authority
 openssl genrsa -out "$PRIMARY_SECRETS/ca.key" 4096 >/dev/null 2>&1
 openssl req -x509 -new -key "$PRIMARY_SECRETS/ca.key" -sha256 -days 3650 \
-  -out "$PRIMARY_SECRETS/ca.crt" -subj "/CN=Debezium-POC-CA" >/dev/null 2>&1
+  -out "$PRIMARY_SECRETS/ca.crt" -subj "/CN=Debezium-project-CA" >/dev/null 2>&1
 
 # 2) Create broker key/certificate signed by the CA
 openssl genrsa -out "$TMP_DIR/kafka.key" 4096 >/dev/null 2>&1
